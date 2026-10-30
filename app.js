@@ -333,8 +333,12 @@ function renderPlan() {
         return `<button type="button" class="room${here ? " here" : ""}${here && pop ? " pop" : ""}" data-room="${esc(id)}" aria-label="Kamar ${esc(label)}${here ? ", setrika ada di sini" : ""}">
       <span>${esc(label)}</span>${here ? `<small><svg class="ic" aria-hidden="true"><use href="#i-iron"/></svg>Setrika di sini</small>` : ""}</button>`;
     };
-    $("#colL").innerHTML = L.left.map(btn).join("");
-    $("#colR").innerHTML = L.right.map(btn).join("");
+    const diff = L.right.length - L.left.length;
+    const spacers = diff > 0 ? '<div class="room spacer" aria-hidden="true"></div>'.repeat(diff) : '';
+    $("#colL").innerHTML = spacers + L.left.map(btn).join("");
+    const diffR = L.left.length - L.right.length;
+    const spacersR = diffR > 0 ? '<div class="room spacer" aria-hidden="true"></div>'.repeat(diffR) : '';
+    $("#colR").innerHTML = spacersR + L.right.map(btn).join("");
     prevRoomKey = roomNow;
 }
 

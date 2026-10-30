@@ -708,6 +708,13 @@ p {
     transition: transform var(--d) var(--ease), background-color var(--d) var(--ease), border-color var(--d) var(--ease), box-shadow var(--d) var(--ease)
 }
 
+.room.spacer {
+    visibility: hidden;
+    pointer-events: none;
+    border-color: transparent;
+    background: transparent;
+}
+
 .room:active {
     transform: scale(.97)
 }
