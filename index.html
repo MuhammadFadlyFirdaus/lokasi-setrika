@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="id">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#eef0f2" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0f1419" media="(prefers-color-scheme: dark)">
+    <title>SetrikaMap: lokasi setrika asrama</title>
+    <meta name="description"
+        content="Setrika bersama sekarang ada di kamar mana? Lihat lokasi terakhir dan perbarui kalau setrikanya pindah.">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+        <symbol id="i-iron" viewBox="0 0 24 24">
+            <path fill-rule="evenodd"
+                d="M2 20v-1.6L5.4 10.5h9.1c2.9 0 5.4 1.8 6.5 4.5l1.4 3.4c.4 1-.3 1.6-1.2 1.6zM9.3 14.5a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 1 0 0-2.2z"
+                fill="currentColor" />
+            <path d="M7.2 10.4 8.6 7.2c.3-.7.9-1 1.6-1h3.9" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" />
+        </symbol>
+        <symbol id="i-check" viewBox="0 0 20 20">
+            <path d="M4.5 10.5l3.6 3.6 7.4-8" fill="none" stroke="currentColor" stroke-width="2.4"
+                stroke-linecap="round" stroke-linejoin="round" />
+        </symbol>
+    </svg>
+    <noscript>
+        <p style="padding:16px">SetrikaMap membutuhkan JavaScript untuk berjalan.</p>
+    </noscript>
+
+    <div class="app">
+        <header class="top enter" style="--i:0">
+            <div class="brand">
+                <h1>SetrikaMap</h1>
+                <p>Lokasi setrika bersama asrama</p>
+            </div>
+            <label class="pick-lorong" id="lorongWrap" hidden><span>Lorong</span>
+                <select id="lorongSel"></select>
+            </label>
+        </header>
+
+        <p class="notice enter" id="demo" style="--i:1" hidden>Mode demo: data hanya tersimpan di browser ini. Isi
+            SUPABASE_URL dan SUPABASE_ANON_KEY di app.js agar semua penghuni melihat data yang sama.</p>
+        <div id="banner"></div>
+
+        <main class="layout">
+            <section class="hero enter quiet" id="hero" style="--i:2" aria-labelledby="stQ">
+                <div class="hero-top">
+                    <svg class="ic" aria-hidden="true">
+                        <use href="#i-iron" />
+                    </svg>
+                    <h2 id="stQ">Setrika sekarang ada di mana?</h2>
+                </div>
+                <div class="stage" id="stBody"></div>
+                <button type="button" class="btn primary block" id="btnUpdate">Perbarui Lokasi</button>
+                <p class="note">Lokasi diperbarui manual oleh penghuni, bukan pelacakan otomatis.</p>
+            </section>
+
+            <section class="plan enter" style="--i:3" aria-labelledby="dnH">
+                <h2 class="sec-h" id="dnH">Denah <span class="where" id="planName"></span></h2>
+                <p class="hint">Setrika pindah ke kamarmu? Ketuk nomor kamar di bawah.</p>
+                <div class="floor">
+                    <div class="col" id="colL"></div>
+                    <div class="corridor" aria-hidden="true"><span>Lorong</span></div>
+                    <div class="col" id="colR"></div>
+                </div>
+            </section>
+
+            <section class="history enter" style="--i:4" aria-labelledby="hsH">
+                <h2 class="sec-h" id="hsH">Riwayat Lokasi</h2>
+                <div id="hist"></div>
+                <button type="button" class="link" id="btnMore" aria-expanded="false" aria-controls="histMore"
+                    hidden></button>
+            </section>
+
+            <details class="help enter" style="--i:5">
+                <summary>Cara pakai</summary>
+                <ol>
+                    <li>Cek lokasi dan waktu pembaruan di bagian atas.</li>
+                    <li>Kalau kamu membawa setrika ke kamarmu, ketuk Perbarui Lokasi lalu pilih kamarmu.</li>
+                    <li>Selesai dipakai? Perbarui lagi ke Tempat penyimpanan atau kamar berikutnya.</li>
+                </ol>
+                <p>Karena diisi manual, cek waktu pembaruannya. Kalau sudah lama, setrikanya mungkin sudah pindah.</p>
+            </details>
+        </main>
+    </div>
+
+    <dialog id="dlg">
+        <section class="pane" id="panePick">
+            <h2 id="pkTitle" tabindex="-1">Perbarui Lokasi</h2>
+            <label class="lbl" for="q">Cari kamar</label>
+            <input id="q" type="search" inputmode="search" autocomplete="off" maxlength="20" placeholder="Contoh: 275">
+            <div id="opts"></div>
+            <form id="otherBox" hidden novalidate>
+                <label class="lbl" for="otherIn">Lokasi lain</label>
+                <input id="otherIn" type="text" maxlength="40" autocomplete="off" placeholder="Contoh: Dapur lantai 2">
+                <p class="err" id="otherErr" role="alert"></p>
+                <button type="submit" class="btn primary block">Lanjut</button>
+            </form>
+            <div class="actions"><button type="button" class="btn" id="pkCancel">Batalkan</button></div>
+        </section>
+
+        <section class="pane" id="paneConfirm" hidden>
+            <h2 id="cfTitle" tabindex="-1"></h2>
+            <div class="field">
+                <label class="lbl" for="fName">Nama (opsional)</label>
+                <input id="fName" type="text" maxlength="30" autocomplete="name" placeholder="Contoh: Rani">
+                <p class="note">Tampil di riwayat agar teman tahu siapa yang membawa.</p>
+            </div>
+            <p class="err" id="cfErr" role="alert"></p>
+            <div class="actions">
+                <button type="button" class="btn" id="cfCancel">Batalkan</button>
+                <button type="button" class="btn primary" id="cfOk">Konfirmasi</button>
+            </div>
+            <button type="button" class="link" id="cfBack">Pilih lokasi lain</button>
+        </section>
+    </dialog>
+
+    <div class="toast" id="toast" role="status"><svg class="ic" aria-hidden="true" hidden>
+            <use href="#i-check" />
+        </svg><span id="toastTxt"></span></div>
+    <div class="sr" id="announce" aria-live="polite"></div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
