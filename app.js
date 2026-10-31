@@ -1,16 +1,6 @@
 "use strict";
 
-/* ===== Konfigurasi =====
-   ISI SUPABASE_URL dan SUPABASE_ANON_KEY dari project Supabase kamu.
-   Kalau kosong = mode demo (data hanya di browser ini).
-   
-   Cara mendapatkan:
-   1. Buka https://supabase.com/dashboard
-   2. Pilih project kamu
-   3. Pergi ke Settings > API
-   4. Copy "Project URL" → isi ke SUPABASE_URL
-   5. Copy "anon public" key → isi ke SUPABASE_ANON_KEY
-*/
+/* ===== Konfigurasi ===== */
 const CONFIG = {
     SUPABASE_URL: "https://mdkxgvlbbwsucziujfmn.supabase.co",
     SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ka3hndmxiYndzdWN6aXVqZm1uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1ODQ0MzMsImV4cCI6MjEwODE2MDQzM30.Ovx6Vsm5PLKMOtoglhUyE5CcHVD-V4x7kHgT_l5sBLU",
@@ -19,12 +9,14 @@ const CONFIG = {
     POLL_MS: 5000,
     HISTORY_MAX: 20,
     HISTORY_SHOWN: 6,
+    SESSION_MINUTES: 15,
+    CONFIRM_MINUTES: 2,
     LORONG: [
         {
             id: "270",
             name: "Lorong 270-280",
             storage: "Tempat penyimpanan",
-            left: [["280", "SR 280"], ["278", "278"], ["276", "276"], ["274", "274"], ["270", "270"]],
+            left: [["280", "SR 280"], ["278", "278"], ["276", "276"], ["274", "274"], null, ["270", "270"]],
             right: [["279", "279"], ["277", "277"], ["275", "275"], ["273", "273"], ["272", "272"], ["271", "271"]]
         }
     ]
@@ -67,11 +59,17 @@ function freshness(ts, now = Date.now()) {
     if (age < CONFIG.STALE_HOURS * 3600000) return "recent";
     return "stale";
 }
+function fmtCountdown(ms) {
+    if (ms <= 0) return "0:00";
+    const totalSec = Math.ceil(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return m + ":" + String(s).padStart(2, "0");
+}
 
-/* ===== Lokasi =====
-   Disimpan sebagai teks: "room:275", "storage", atau "other:Dapur lantai 2". */
+/* ===== Lokasi ===== */
 const curL = () => CONFIG.LORONG.find(l => l.id === cur);
-const roomsOf = L => [...L.left, ...L.right].map(([id, label]) => ({ id, label }))
+const roomsOf = L => [...L.left, ...L.right].filter(Boolean).map(([id, label]) => ({ id, label }))
     .sort((a, b) => a.id.localeCompare(b.id, "id", { numeric: true }));
 function parseLoc(s) {
     if (!s) return null;
@@ -94,7 +92,6 @@ function matchRoom(L, text) {
     return roomsOf(L).find(r => r.id.toLowerCase() === t || r.label.toLowerCase().replace(/\s+/g, "") === t) || null;
 }
 
-/* Merapikan data dari penyimpanan, termasuk format lama (field "room"). */
 function norm(d) {
     d = d || {};
     const conv = x => x.loc || (x.room ? "room:" + x.room : "storage");
@@ -105,7 +102,20 @@ function norm(d) {
     return { loc, name: d.name || d.holder || "", at: d.at || null, history: hist };
 }
 
-/* ===== Supabase Client (tanpa SDK, pakai REST API langsung) ===== */
+/* ===== ID Sesi Client ===== */
+function getClientSessionId() {
+    let id = localStorage.getItem("setrikamap.session_id");
+    if (!id) {
+        id = (crypto.randomUUID ? crypto.randomUUID() :
+            ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+                (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)));
+        localStorage.setItem("setrikamap.session_id", id);
+    }
+    return id;
+}
+const CLIENT_SESSION_ID = getClientSessionId();
+
+/* ===== Supabase Client ===== */
 const SUPA_URL = (CONFIG.SUPABASE_URL || "").replace(/\/+$/, "");
 const SUPA_KEY = CONFIG.SUPABASE_ANON_KEY || "";
 
@@ -118,65 +128,49 @@ const supaRest = {
             "Prefer": "return=representation"
         };
     },
-
-    /* GET rows from a table with query params */
     async get(table, params = "") {
-        const r = await fetch(`${SUPA_URL}/rest/v1/${table}?${params}`, {
-            headers: this.headers(),
-            cache: "no-store"
-        });
+        const r = await fetch(`${SUPA_URL}/rest/v1/${table}?${params}`, { headers: this.headers(), cache: "no-store" });
         if (!r.ok) throw new Error("Supabase GET " + r.status);
         return r.json();
     },
-
-    /* UPSERT (insert or update) a row */
     async upsert(table, data) {
         const h = this.headers();
         h["Prefer"] = "return=representation,resolution=merge-duplicates";
-        const r = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
-            method: "POST",
-            headers: h,
-            body: JSON.stringify(data)
-        });
+        const r = await fetch(`${SUPA_URL}/rest/v1/${table}`, { method: "POST", headers: h, body: JSON.stringify(data) });
         if (!r.ok) throw new Error("Supabase UPSERT " + r.status);
         return r.json();
     },
-
-    /* INSERT a row */
     async insert(table, data) {
-        const r = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
-            method: "POST",
-            headers: this.headers(),
-            body: JSON.stringify(data)
-        });
+        const r = await fetch(`${SUPA_URL}/rest/v1/${table}`, { method: "POST", headers: this.headers(), body: JSON.stringify(data) });
         if (!r.ok) throw new Error("Supabase INSERT " + r.status);
         return r.json();
+    },
+    async patch(table, match, data) {
+        const params = Object.entries(match).map(([k, v]) => `${k}=eq.${encodeURIComponent(v)}`).join("&");
+        const r = await fetch(`${SUPA_URL}/rest/v1/${table}?${params}`, { method: "PATCH", headers: this.headers(), body: JSON.stringify(data) });
+        if (!r.ok) throw new Error("Supabase PATCH " + r.status);
+        return r.json();
+    },
+    async del(table, match) {
+        const params = Object.entries(match).map(([k, v]) => `${k}=eq.${encodeURIComponent(v)}`).join("&");
+        const r = await fetch(`${SUPA_URL}/rest/v1/${table}?${params}`, { method: "DELETE", headers: this.headers() });
+        if (!r.ok) throw new Error("Supabase DELETE " + r.status);
+        return true;
     }
 };
 
-/* ===== Penyimpanan ===== */
+/* ===== Penyimpanan Lokasi ===== */
 const CLOUD = !!(SUPA_URL && SUPA_KEY);
 
 const Store = {
     mode: CLOUD ? "cloud" : "local",
-
     async load(id) {
         if (CLOUD) {
-            /* Ambil status terkini dari tabel lorong_status */
-            const statusRows = await supaRest.get("lorong_status",
-                `lorong_id=eq.${encodeURIComponent(id)}&select=*`);
+            const statusRows = await supaRest.get("lorong_status", `lorong_id=eq.${encodeURIComponent(id)}&select=*`);
             const status = statusRows[0] || null;
-
-            /* Ambil riwayat dari tabel location_history, terbaru dulu, max 20 */
             const histRows = await supaRest.get("location_history",
                 `lorong_id=eq.${encodeURIComponent(id)}&order=created_at.desc&limit=${CONFIG.HISTORY_MAX}`);
-
-            const history = histRows.map(h => ({
-                loc: h.loc,
-                name: h.name || "",
-                at: new Date(h.created_at).getTime()
-            }));
-
+            const history = histRows.map(h => ({ loc: h.loc, name: h.name || "", at: new Date(h.created_at).getTime() }));
             return {
                 loc: status ? status.loc : null,
                 name: status ? (status.name || "") : "",
@@ -184,39 +178,88 @@ const Store = {
                 history
             };
         }
-
-        /* Mode lokal (demo) */
         let raw = null;
         try { raw = JSON.parse(localStorage.getItem("setrikamap.v2." + id)); } catch (e) { raw = null; }
         return norm(raw);
     },
-
     async save(id, data) {
         if (CLOUD) {
             const now = new Date().toISOString();
-
-            /* Upsert status terkini ke lorong_status */
-            await supaRest.upsert("lorong_status", {
-                lorong_id: id,
-                loc: data.loc,
-                name: data.name || "",
-                updated_at: now
-            });
-
-            /* Insert riwayat baru ke location_history */
-            await supaRest.insert("location_history", {
-                lorong_id: id,
-                loc: data.loc,
-                name: data.name || "",
-                created_at: now
-            });
-
+            await supaRest.upsert("lorong_status", { lorong_id: id, loc: data.loc, name: data.name || "", updated_at: now });
+            await supaRest.insert("location_history", { lorong_id: id, loc: data.loc, name: data.name || "", created_at: now });
             return;
         }
-
-        /* Mode lokal (demo) */
         localStorage.setItem("setrikamap.v2." + id, JSON.stringify(data));
     }
+};
+
+/* ===== Penyimpanan Sesi ===== */
+const SessionStore = {
+    async load(lorongId) {
+        if (!CLOUD) return null;
+        const rows = await supaRest.get("iron_session", `lorong_id=eq.${encodeURIComponent(lorongId)}&select=*`);
+        if (!rows.length) return null;
+        const s = rows[0];
+        if (!s.session_end_at) {
+            const elapsed = Date.now() - new Date(s.session_start).getTime();
+            if (elapsed > CONFIG.SESSION_MINUTES * 60000) {
+                try { await supaRest.patch("iron_session", { lorong_id: lorongId }, { session_end_at: new Date().toISOString(), ended_by: "timeout" }); } catch(e) {}
+                return { ...s, session_end_at: new Date().toISOString(), ended_by: "timeout" };
+            }
+        }
+        return s;
+    },
+    async start(lorongId, userName) {
+        const now = new Date().toISOString();
+        const rows = await supaRest.upsert("iron_session", {
+            lorong_id: lorongId, session_id: CLIENT_SESSION_ID,
+            user_name: userName, session_start: now, session_end_at: null, ended_by: ""
+        });
+        return rows[0];
+    },
+    async end(lorongId, reason = "user") {
+        await supaRest.patch("iron_session", { lorong_id: lorongId }, { session_end_at: new Date().toISOString(), ended_by: reason });
+    }
+};
+
+/* ===== Penyimpanan Antrian ===== */
+const QueueStore = {
+    async load(lorongId) {
+        if (!CLOUD) return [];
+        return supaRest.get("iron_queue",
+            `lorong_id=eq.${encodeURIComponent(lorongId)}&status=in.(waiting,ready)&order=queue_number.asc&select=*`);
+    },
+    async nextNumber(lorongId) {
+        const rows = await supaRest.get("iron_queue",
+            `lorong_id=eq.${encodeURIComponent(lorongId)}&order=queue_number.desc&limit=1&select=queue_number`);
+        return rows.length ? (rows[0].queue_number + 1) : 1;
+    },
+    async join(lorongId, userName) {
+        const existing = await supaRest.get("iron_queue",
+            `lorong_id=eq.${encodeURIComponent(lorongId)}&session_id=eq.${encodeURIComponent(CLIENT_SESSION_ID)}&status=in.(waiting,ready)&select=id`);
+        if (existing.length) throw new Error("ALREADY_IN_QUEUE");
+        // Gunakan joined_at sebagai primary ordering; queue_number hanya referensi awal
+        // Retry sekali jika ada conflict (mitigasi race condition)
+        const doInsert = async () => {
+            const num = await this.nextNumber(lorongId);
+            return supaRest.insert("iron_queue", {
+                lorong_id: lorongId, session_id: CLIENT_SESSION_ID,
+                user_name: userName, status: "waiting",
+                joined_at: new Date().toISOString(), queue_number: num
+            });
+        };
+        let rows;
+        try {
+            rows = await doInsert();
+        } catch (e) {
+            // Retry sekali jika gagal (misal conflict nomor)
+            rows = await doInsert();
+        }
+        return rows[0];
+    },
+    async cancel(queueId) { await supaRest.patch("iron_queue", { id: queueId }, { status: "cancelled" }); },
+    async markReady(queueId) { await supaRest.patch("iron_queue", { id: queueId }, { status: "ready", ready_at: new Date().toISOString() }); },
+    async markDone(queueId) { await supaRest.patch("iron_queue", { id: queueId }, { status: "done" }); }
 };
 
 const profile = {
@@ -224,30 +267,84 @@ const profile = {
     set(p) { try { localStorage.setItem("setrikamap.profile", JSON.stringify(p)); } catch (e) { } }
 };
 
-/* ===== Supabase Realtime (SSE via Realtime channel) =====
-   Mendengarkan perubahan di tabel lorong_status secara realtime
-   menggunakan Supabase Realtime over WebSocket (tanpa SDK). 
-   Fallback ke polling jika WebSocket tidak tersedia. */
-let realtimeWs = null;
-
-function setupRealtime() {
-    if (!CLOUD) return;
-
-    /* Gunakan polling sebagai strategi yang lebih reliable tanpa SDK */
-    setInterval(() => {
-        if (!document.hidden && !$("#dlg").open) refresh(true);
-    }, CONFIG.POLL_MS);
-}
-
 /* ===== State ===== */
 let cur = CONFIG.LORONG[0].id;
 let S = norm(null);
 let loading = true, loaded = false, error = "", showAllHist = false;
 let pendingLoc = null;
-let prevKey = null;        // lokasi yang terakhir ditampilkan di hero (untuk animasi pergantian)
-let prevRoomKey;           // kamar yang terakhir ditandai di denah (untuk animasi tanda)
+let prevKey = null;
+let prevRoomKey;
+let QS = { session: null, queue: [], loadError: false };
+let sessionTimerInterval = null;
+let confirmTimerInterval = null;
 
-/* ===== Render ===== */
+/* ===== Helper State ===== */
+function isSessionActive(sess) {
+    if (!sess || sess.session_end_at) return false;
+    return (Date.now() - new Date(sess.session_start).getTime()) < CONFIG.SESSION_MINUTES * 60000;
+}
+function isMySession(sess) { return sess && sess.session_id === CLIENT_SESSION_ID; }
+function myQueueEntry() { return QS.queue.find(q => q.session_id === CLIENT_SESSION_ID) || null; }
+function isReadyExpired(entry) {
+    if (!entry || entry.status !== "ready" || !entry.ready_at) return false;
+    return (Date.now() - new Date(entry.ready_at).getTime()) > CONFIG.CONFIRM_MINUTES * 60000;
+}
+function stopTimers() {
+    clearInterval(sessionTimerInterval); clearInterval(confirmTimerInterval);
+    sessionTimerInterval = null; confirmTimerInterval = null;
+}
+
+function startSessionTimer(sess) {
+    stopTimers();
+    if (!sess || !isSessionActive(sess)) return;
+    const startMs = new Date(sess.session_start).getTime();
+    const limitMs = CONFIG.SESSION_MINUTES * 60000;
+    sessionTimerInterval = setInterval(() => {
+        const remaining = limitMs - (Date.now() - startMs);
+        const bar = $("#sessionBar");
+        if (!bar) { clearInterval(sessionTimerInterval); return; }
+        if (remaining <= 0) { clearInterval(sessionTimerInterval); refreshAll(true); return; }
+        const timerEl = bar.querySelector(".sb-timer");
+        if (timerEl) { timerEl.textContent = fmtCountdown(remaining); timerEl.classList.toggle("urgent", remaining < 120000); }
+    }, 1000);
+}
+
+function startConfirmTimer(readyEntry) {
+    clearInterval(confirmTimerInterval);
+    if (!readyEntry || readyEntry.status !== "ready" || !readyEntry.ready_at) return;
+    const readyMs = new Date(readyEntry.ready_at).getTime();
+    const limitMs = CONFIG.CONFIRM_MINUTES * 60000;
+    confirmTimerInterval = setInterval(() => {
+        const remaining = limitMs - (Date.now() - readyMs);
+        const cd = document.querySelector(`.queue-item[data-qid="${readyEntry.id}"] .qi-countdown`);
+        if (cd) {
+            if (remaining <= 0) {
+                cd.textContent = "Giliran habis — melewati..."; cd.classList.add("urgent");
+                clearInterval(confirmTimerInterval);
+                handleReadyExpired().catch(() => {});
+                return;
+            }
+            cd.textContent = `Konfirmasi dalam: ${fmtCountdown(remaining)}`;
+            cd.classList.toggle("urgent", remaining < 30000);
+        } else { clearInterval(confirmTimerInterval); }
+    }, 1000);
+}
+
+async function handleReadyExpired() {
+    const frontReady = QS.queue.find(q => q.status === "ready");
+    if (!frontReady) return;
+    await QueueStore.markDone(frontReady.id);
+    toast("Giliran dilewati karena tidak dikonfirmasi.");
+    await refreshAll(true);
+    const next = QS.queue.find(q => q.status === "waiting");
+    if (next) {
+        await QueueStore.markReady(next.id);
+        if (next.session_id === CLIENT_SESSION_ID) toast("Giliran kamu tiba! Tekan konfirmasi untuk mulai.", true);
+        await refreshAll(true);
+    }
+}
+
+/* ===== Render Lokasi ===== */
 function renderTop() {
     $("#demo").hidden = Store.mode !== "local";
     const wrap = $("#lorongWrap");
@@ -260,7 +357,6 @@ function renderBanner() {
         ? `<div class="notice error" role="alert"><span>${esc(error)}</span><button type="button" class="btn" id="btnRetry">Coba lagi</button></div>`
         : "";
 }
-
 function locHtml(s, L) {
     const p = parseLoc(s);
     if (p && p.kind === "room") {
@@ -275,41 +371,30 @@ const textHtml = t => `<p class="loc n-m dim"><span class="loc-n">${esc(t)}</spa
 function renderStatus() {
     const box = $("#stBody"), hero = $("#hero"), L = curL();
     let html = "", tone = "quiet", key = null, known = false;
-
     if (loading && !loaded) {
         html = `<div class="skel" role="status"><div class="iron-run" aria-hidden="true"><svg class="ic"><use href="#i-iron"/></svg></div>
       <i class="bar b1" aria-hidden="true"></i><i class="bar b2" aria-hidden="true"></i><p class="skel-t">Memuat lokasi...</p></div>`;
     } else if (error && !loaded) {
-        html = textHtml("Lokasi belum bisa dimuat") +
-            `<p class="fresh fresh-stale"><span class="dot"></span><span>Cek koneksi internet, lalu coba lagi.</span></p>`;
+        html = textHtml("Lokasi belum bisa dimuat") + `<p class="fresh fresh-stale"><span class="dot"></span><span>Cek koneksi internet, lalu coba lagi.</span></p>`;
     } else if (!S.loc || !S.at) {
-        html = textHtml("Belum diketahui") +
-            `<p class="fresh"><span class="dot"></span><span>Belum ada yang memperbarui lokasi setrika di lorong ini. Kalau kamu tahu, perbarui sekarang.</span></p>`;
+        html = textHtml("Belum diketahui") + `<p class="fresh"><span class="dot"></span><span>Belum ada yang memperbarui lokasi setrika di lorong ini.</span></p>`;
     } else {
         known = true; key = S.loc;
         const f = freshness(S.at), rel = relTime(S.at), when = absTime(S.at);
         tone = f === "stale" ? "quiet" : "warm";
-        const line = f === "stale"
-            ? `Terakhir diperbarui ${rel} (${when}). Lokasi mungkin sudah berubah.`
-            : `Diperbarui ${rel} (${when})`;
+        const line = f === "stale" ? `Terakhir diperbarui ${rel} (${when}). Lokasi mungkin sudah berubah.` : `Diperbarui ${rel} (${when})`;
         const p = parseLoc(S.loc);
         const sub = S.name ? `Dibawa ${esc(S.name)}` : (p && p.kind === "storage" ? "Bisa langsung diambil" : "");
-        html = locHtml(S.loc, L) +
-            (sub ? `<p class="sub">${sub}</p>` : "") +
+        html = locHtml(S.loc, L) + (sub ? `<p class="sub">${sub}</p>` : "") +
             `<p class="fresh fresh-${f === "fresh" ? "ok" : (f === "stale" ? "stale" : "mid")}"><span class="dot"></span><span>${esc(line)}</span></p>`;
     }
-
-    /* Pergantian lokasi: yang lama meluncur naik dan memudar, yang baru muncul dari bawah. */
     const changed = known && key !== prevKey;
     const old = box.querySelector(".loc");
     let ghost = null;
     if (changed && old) {
-        ghost = old.cloneNode(true);
-        ghost.classList.remove("loc");
-        ghost.classList.add("loc-old");
+        ghost = old.cloneNode(true); ghost.classList.remove("loc"); ghost.classList.add("loc-old");
         ghost.setAttribute("aria-hidden", "true");
     }
-    /* Kalau lama dan baru sama-sama kamar, label "Kamar" tetap diam; hanya angkanya yang bergerak. */
     const keepLabel = !!(ghost && ghost.querySelector(".loc-k") && html.includes('class="loc-k"'));
     box.className = "stage" + (changed ? " changed" : "") + (keepLabel ? " keep-k" : "");
     box.innerHTML = html;
@@ -333,12 +418,9 @@ function renderPlan() {
         return `<button type="button" class="room${here ? " here" : ""}${here && pop ? " pop" : ""}" data-room="${esc(id)}" aria-label="Kamar ${esc(label)}${here ? ", setrika ada di sini" : ""}">
       <span>${esc(label)}</span>${here ? `<small><svg class="ic" aria-hidden="true"><use href="#i-iron"/></svg>Setrika di sini</small>` : ""}</button>`;
     };
-    const diff = L.right.length - L.left.length;
-    const spacers = diff > 0 ? '<div class="room spacer" aria-hidden="true"></div>'.repeat(diff) : '';
-    $("#colL").innerHTML = spacers + L.left.map(btn).join("");
-    const diffR = L.left.length - L.right.length;
-    const spacersR = diffR > 0 ? '<div class="room spacer" aria-hidden="true"></div>'.repeat(diffR) : '';
-    $("#colR").innerHTML = spacersR + L.right.map(btn).join("");
+    const cell = item => item === null ? '<div class="room spacer" aria-hidden="true"></div>' : btn(item);
+    $("#colL").innerHTML = L.left.map(cell).join("");
+    $("#colR").innerHTML = L.right.map(cell).join("");
     prevRoomKey = roomNow;
 }
 
@@ -364,8 +446,7 @@ function renderHist() {
             lastDay = d; hasMore = true;
         } else if (d !== lastDay) {
             if (lastDay) html += "</ul>";
-            html += `<h3 class="day">${esc(d)}</h3><ul class="hist">`;
-            lastDay = d;
+            html += `<h3 class="day">${esc(d)}</h3><ul class="hist">`; lastDay = d;
         }
         html += `<li${i === 0 ? ' class="cur"' : ""}><time datetime="${new Date(h.at).toISOString()}">${clock(h.at)}</time><i class="hd" aria-hidden="true"></i>
       <span class="hl">${esc(locText(h.loc, L))}</span>${h.name ? `<span class="who">${esc(h.name)}</span>` : ""}</li>`;
@@ -374,7 +455,119 @@ function renderHist() {
     more.hidden = !hasMore;
     if (hasMore) syncMore();
 }
-function render() { renderTop(); renderBanner(); renderStatus(); renderPlan(); renderHist(); }
+
+/* ===== Render Sesi & Antrian ===== */
+function renderSessionBox() {
+    const box = $("#sessionBox"), bar = $("#sessionBar"), sess = QS.session;
+    const active = isSessionActive(sess);
+    box.hidden = !active;
+    if (!active) return;
+    const startMs = new Date(sess.session_start).getTime();
+    const remaining = CONFIG.SESSION_MINUTES * 60000 - (Date.now() - startMs);
+    const who = sess.user_name || "Seseorang";
+    bar.innerHTML = `
+        <div class="sb-label">
+            <svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg>
+            <span>${isMySession(sess) ? "Kamu sedang menggunakan" : `${esc(who)} sedang menggunakan`} &middot; Sisa waktu</span>
+        </div>
+        <span class="sb-timer${remaining < 120000 ? " urgent" : ""}">${fmtCountdown(remaining)}</span>`;
+    startSessionTimer(sess);
+}
+
+function renderHeroButtons() {
+    const sess = QS.session, active = isSessionActive(sess);
+    const myEntry = myQueueEntry(), iAmReady = myEntry && myEntry.status === "ready";
+    const activeByOther = active && !isMySession(sess);
+    const activeByMe = active && isMySession(sess);
+    const hasQueue = QS.queue.length > 0;
+
+    // Kunci tombol "Perbarui Lokasi" jika setrika sedang digunakan
+    const btnUpdate = $("#btnUpdate");
+    if (btnUpdate) {
+        btnUpdate.disabled = active;
+        btnUpdate.title = active ? "Setrika sedang digunakan, lokasi terkunci sementara" : "";
+    }
+
+    if (!CLOUD) {
+        ["#btnStartSession","#btnEndSession","#btnJoinQueue","#btnCancelQueue","#btnConfirmTurn"]
+            .forEach(id => $(id).hidden = true);
+        return;
+    }
+    // Mulai Menggunakan: tampil hanya jika tidak ada sesi aktif DAN tidak ada antrian DAN saya tidak di antrian
+    $("#btnStartSession").hidden = active || hasQueue || !!myEntry;
+    // Selesai: saya yang memakai
+    $("#btnEndSession").hidden = !activeByMe;
+    // Ambil Antrian: ada sesi orang lain ATAU ada antrian (tapi setrika tidak dipakai oleh saya), dan saya belum di antrian
+    $("#btnJoinQueue").hidden = !((activeByOther || (hasQueue && !activeByMe)) && !myEntry);
+    // Batalkan Antrian: saya di antrian waiting
+    $("#btnCancelQueue").hidden = !(myEntry && myEntry.status === "waiting");
+    // Konfirmasi Giliran: saya ready
+    $("#btnConfirmTurn").hidden = !iAmReady;
+}
+
+function renderQueue() {
+    const body = $("#queueBody"), queue = QS.queue;
+    if (QS.loadError) { body.innerHTML = `<p class="queue-empty">Gagal memuat antrian. Cek koneksi internet.</p>`; return; }
+    if (!queue.length) { body.innerHTML = `<p class="queue-empty">Belum ada antrian. Setrika bebas digunakan.</p>`; return; }
+
+    const count = queue.length;
+    let html = `<p class="queue-count">${count} orang dalam antrian</p><ul class="queue-list">`;
+    queue.forEach((q, idx) => {
+        const isMine = q.session_id === CLIENT_SESSION_ID;
+        const isReady = q.status === "ready";
+        let countdownHtml = "";
+        if (isReady && !isReadyExpired(q) && q.ready_at) {
+            const remaining = CONFIG.CONFIRM_MINUTES * 60000 - (Date.now() - new Date(q.ready_at).getTime());
+            if (remaining > 0) {
+                countdownHtml = `<p class="qi-countdown${remaining < 30000 ? " urgent" : ""}">Konfirmasi dalam: ${fmtCountdown(remaining)}</p>`;
+            }
+        }
+        const statusLabel = isReady ? (isMine ? "✨ Giliran kamu!" : "Giliran Berikutnya")
+            : (idx === 0 ? "Menunggu giliran berikutnya" : "Menunggu");
+        const cancelBtn = (isMine && q.status === "waiting")
+            ? `<button class="qi-cancel" data-cancel-qid="${esc(q.id)}" aria-label="Batalkan antrianku"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>`
+            : `<div></div>`;
+        // Gunakan idx+1 sebagai nomor tampilan (bukan queue_number dari DB) agar ordering konsisten
+        // Tambah --i:${idx} untuk staggered animation di CSS
+        html += `<li class="queue-item${isReady ? " ready" : ""}${isMine ? " mine" : ""}" data-qid="${esc(q.id)}" style="--i:${idx}">
+            <div class="qi-num">${idx + 1}</div>
+            <div class="qi-info">
+                <div class="qi-name">${esc(q.user_name || "Tanpa nama")}</div>
+                <div class="qi-status">${esc(statusLabel)}</div>
+                ${countdownHtml}
+            </div>
+            ${cancelBtn}
+        </li>`;
+    });
+    html += "</ul>";
+    body.innerHTML = html;
+    const myReady = myQueueEntry();
+    if (myReady && myReady.status === "ready") startConfirmTimer(myReady);
+}
+
+function renderQueueJoinForm() {
+    const form = $("#queueJoinForm"), myEntry = myQueueEntry(), sess = QS.session;
+    const activeByOther = isSessionActive(sess) && !isMySession(sess);
+    // Tampilkan form jika: setrika dipakai orang lain ATAU sudah ada antrian,
+    // dan user belum di antrian dan bukan pemilik sesi aktif
+    const canJoin = (activeByOther || QS.queue.length > 0) && !myEntry && !isMySession(sess);
+    form.hidden = !(canJoin && CLOUD);
+
+    // Isi pilihan kamar jika elemen select tersedia
+    const sel = $("#queueRoom");
+    if (sel && curL()) {
+        const rooms = roomsOf(curL());
+        const savedRoom = profile.get().room || "";
+        const currentVal = sel.value || savedRoom;
+        sel.innerHTML = '<option value="">-- Pilih Kamar (270 - 280) --</option>' +
+            rooms.map(r => `<option value="${esc(r.id)}"${r.id === currentVal ? " selected" : ""}>Kamar ${esc(r.label)}</option>`).join("");
+    }
+}
+
+function renderAll() {
+    renderTop(); renderBanner(); renderStatus(); renderPlan(); renderHist();
+    renderSessionBox(); renderHeroButtons(); renderQueue(); renderQueueJoinForm();
+}
 
 /* ===== Data ===== */
 async function refresh(silent) {
@@ -388,13 +581,75 @@ async function refresh(silent) {
         if (id !== cur) return;
         error = "Tidak bisa memuat lokasi setrika. Cek koneksi internet, lalu coba lagi.";
     }
-    loading = false; render();
+    loading = false;
+    renderTop(); renderBanner(); renderStatus(); renderPlan(); renderHist();
 }
+
+async function refreshQueue() {
+    if (!CLOUD) return;
+    try {
+        const [sess, queue] = await Promise.all([SessionStore.load(cur), QueueStore.load(cur)]);
+        QS.session = sess; QS.queue = queue; QS.loadError = false;
+        const sessActive = isSessionActive(sess);
+
+        if (!sessActive && queue.length) {
+            const frontWaiting = queue.find(q => q.status === "waiting");
+            const frontReady = queue.find(q => q.status === "ready");
+            if (!frontReady && frontWaiting) {
+                // Guard: cek ulang dari DB sebelum markReady untuk mengurangi concurrent calls
+                const latestQueue = await QueueStore.load(cur);
+                const latestReady = latestQueue.find(q => q.status === "ready");
+                const latestWaiting = latestQueue.find(q => q.status === "waiting");
+                if (!latestReady && latestWaiting && latestWaiting.id === frontWaiting.id) {
+                    await QueueStore.markReady(frontWaiting.id);
+                    QS.queue = await QueueStore.load(cur);
+                    if (frontWaiting.session_id === CLIENT_SESSION_ID) toast("Giliran kamu tiba! Tekan konfirmasi untuk mulai.", true);
+                } else {
+                    QS.queue = latestQueue;
+                }
+            }
+            const readyEntry = QS.queue.find(q => q.status === "ready");
+            if (readyEntry && isReadyExpired(readyEntry)) {
+                // Guard: cek ulang state ready dari DB sebelum mark done
+                const latestCheck = await QueueStore.load(cur);
+                const latestReady = latestCheck.find(q => q.id === readyEntry.id && q.status === "ready");
+                if (latestReady && isReadyExpired(latestReady)) {
+                    await QueueStore.markDone(readyEntry.id);
+                    QS.queue = await QueueStore.load(cur);
+                    const nextW = QS.queue.find(q => q.status === "waiting");
+                    if (nextW) {
+                        const nextCheck = await QueueStore.load(cur);
+                        const nextReady = nextCheck.find(q => q.status === "ready");
+                        if (!nextReady) {
+                            await QueueStore.markReady(nextW.id);
+                            QS.queue = await QueueStore.load(cur);
+                            if (nextW.session_id === CLIENT_SESSION_ID) toast("Giliran kamu tiba! Tekan konfirmasi untuk mulai.", true);
+                        } else {
+                            QS.queue = nextCheck;
+                        }
+                    }
+                } else {
+                    QS.queue = latestCheck;
+                }
+            }
+        }
+    } catch (e) { QS.loadError = true; }
+    renderSessionBox(); renderHeroButtons(); renderQueue(); renderQueueJoinForm();
+}
+
+async function refreshAll(silent) { await Promise.all([refresh(silent), refreshQueue()]); }
+
 function selectLorong(id, fromHash) {
     if (!CONFIG.LORONG.some(l => l.id === id)) id = CONFIG.LORONG[0].id;
     cur = id; S = norm(null); loaded = false; showAllHist = false; prevRoomKey = undefined;
+    QS = { session: null, queue: [], loadError: false }; stopTimers();
     if (!fromHash) { try { history.replaceState(null, "", "#l=" + encodeURIComponent(id)); } catch (e) { } }
-    refresh(false);
+    refreshAll(false);
+}
+
+function setupRealtime() {
+    if (!CLOUD) return;
+    setInterval(() => { if (!document.hidden && !$("#dlg").open) refreshAll(true); }, CONFIG.POLL_MS);
 }
 
 /* ===== Dialog ===== */
@@ -406,10 +661,7 @@ function openDialog() {
 }
 function closeDialog() {
     if (!dlg.open && !dlg.hasAttribute("open")) return;
-    const finish = () => {
-        dlg.classList.remove("closing");
-        if (typeof dlg.close === "function") dlg.close(); else dlg.removeAttribute("open");
-    };
+    const finish = () => { dlg.classList.remove("closing"); if (typeof dlg.close === "function") dlg.close(); else dlg.removeAttribute("open"); };
     if (reduceMotion() || typeof dlg.close !== "function") { finish(); return; }
     if (dlg.classList.contains("closing")) return;
     dlg.classList.add("closing");
@@ -421,11 +673,9 @@ function closeDialog() {
     setTimeout(() => { if (dlg.classList.contains("closing")) finish(); }, 360);
 }
 function showPane(name) {
-    $("#panePick").hidden = name !== "pick";
-    $("#paneConfirm").hidden = name !== "confirm";
+    $("#panePick").hidden = name !== "pick"; $("#paneConfirm").hidden = name !== "confirm";
     const title = name === "pick" ? $("#pkTitle") : $("#cfTitle");
-    dlg.setAttribute("aria-labelledby", title.id);
-    title.focus();   // fokus ke judul, bukan kolom isian, agar keyboard HP tidak langsung muncul
+    dlg.setAttribute("aria-labelledby", title.id); title.focus();
 }
 function renderOpts() {
     const L = curL(), q = $("#q").value.trim().toLowerCase();
@@ -445,61 +695,198 @@ function renderOpts() {
     $("#opts").innerHTML = h;
 }
 function openPick() {
+    if (isSessionActive(QS.session)) {
+        toast("Setrika sedang digunakan. Lokasi tidak bisa dipindahkan sekarang.");
+        return;
+    }
     if (loading && !loaded) { toast("Data masih dimuat. Coba lagi sebentar."); return; }
     $("#q").value = ""; $("#otherIn").value = ""; $("#otherErr").textContent = "";
-    $("#otherBox").hidden = true;
-    renderOpts(); showPane("pick"); openDialog(); $("#pkTitle").focus();
+    $("#otherBox").hidden = true; renderOpts(); showPane("pick"); openDialog(); $("#pkTitle").focus();
 }
 function openConfirm(loc) {
-    const L = curL();
-    pendingLoc = loc;
+    const L = curL(); pendingLoc = loc;
     const p = parseLoc(loc);
-    $("#cfTitle").textContent = p.kind === "storage"
-        ? `Setrika dikembalikan ke ${L.storage}?`
-        : `Setrika sekarang di ${locText(loc, L)}?`;
-    $("#fName").value = profile.get().name || "";
-    $("#cfErr").textContent = "";
+    $("#cfTitle").textContent = p.kind === "storage" ? `Setrika dikembalikan ke ${L.storage}?` : `Setrika sekarang di ${locText(loc, L)}?`;
+    $("#fName").value = profile.get().name || ""; $("#cfErr").textContent = "";
     $("#cfOk").disabled = false; $("#cfOk").textContent = "Konfirmasi";
     showPane("confirm"); openDialog(); $("#cfTitle").focus();
 }
-
 function validateOther(raw) {
-    const L = curL();
-    const text = raw.replace(/\s+/g, " ").trim();
+    const L = curL(), text = raw.replace(/\s+/g, " ").trim();
     if (!text) return { error: "Isi lokasinya dulu." };
     if (text.length < 2) return { error: "Lokasi terlalu pendek." };
     if (text.length > 40) return { error: "Maksimal 40 karakter." };
-    if (!/^[\p{L}\p{N} .,\-\/()]+$/u.test(text)) return { error: "Pakai huruf, angka, atau tanda baca biasa (. , - /)." };
+    if (!/^[\p{L}\p{N} .,\-\/()]+$/u.test(text)) return { error: "Pakai huruf, angka, atau tanda baca biasa." };
     if (!/[\p{L}\p{N}]/u.test(text)) return { error: "Lokasi harus memuat huruf atau angka." };
     const room = matchRoom(L, text);
     if (room) return { loc: "room:" + room.id };
-    if (/^(kamar\s*)?[a-z]{0,2}\s?-?\d{1,4}$/i.test(text)) return { error: "Kamar itu tidak ada di " + L.name + ". Pilih dari daftar, atau tulis lokasi lain." };
+    if (/^(kamar\s*)?[a-z]{0,2}\s?-?\d{1,4}$/i.test(text)) return { error: "Kamar itu tidak ada di " + L.name + ". Pilih dari daftar." };
     return { loc: "other:" + text };
 }
-
 async function submitConfirm() {
     const btn = $("#cfOk"), err = $("#cfErr");
+    if (isSessionActive(QS.session)) {
+        err.textContent = "Setrika sedang digunakan. Lokasi terkunci.";
+        toast("Setrika sedang digunakan. Lokasi tidak bisa dipindahkan.");
+        return;
+    }
     const name = $("#fName").value.replace(/\s+/g, " ").trim();
     if (name.length > 30) { err.textContent = "Nama maksimal 30 karakter."; return; }
     if (!pendingLoc) { err.textContent = "Lokasi belum dipilih."; return; }
     btn.disabled = true; btn.textContent = "Menyimpan..."; err.textContent = "";
     try {
-        const fresh = await Store.load(cur);   // ambil riwayat terbaru agar tidak menimpa perubahan orang lain
-        const now = Date.now();
-        const next = {
-            loc: pendingLoc, name, at: now,
-            history: [{ loc: pendingLoc, name, at: now }, ...fresh.history].slice(0, CONFIG.HISTORY_MAX)
-        };
+        // Cek lagi ke database status sesi terkini
+        if (CLOUD) {
+            const currentSess = await SessionStore.load(cur);
+            if (isSessionActive(currentSess)) {
+                err.textContent = "Setrika sedang digunakan oleh seseorang. Tidak bisa mengubah lokasi.";
+                btn.disabled = false; btn.textContent = "Konfirmasi";
+                await refreshAll(true);
+                return;
+            }
+        }
+        const fresh = await Store.load(cur), now = Date.now();
+        const next = { loc: pendingLoc, name, at: now, history: [{ loc: pendingLoc, name, at: now }, ...fresh.history].slice(0, CONFIG.HISTORY_MAX) };
         await Store.save(cur, next);
         profile.set({ name });
         S = await Store.load(cur); loaded = true; error = "";
-        closeDialog(); render();
+        closeDialog(); renderTop(); renderBanner(); renderStatus(); renderPlan(); renderHist();
         toast("Lokasi setrika berhasil diperbarui.", true);
         $("#announce").textContent = "Setrika sekarang di " + locText(next.loc, curL());
     } catch (e) {
         err.textContent = "Gagal menyimpan. Cek koneksi internet, lalu coba lagi.";
         btn.disabled = false; btn.textContent = "Konfirmasi";
     }
+}
+
+/* ===== Aksi Sesi ===== */
+async function handleStartSession() {
+    const btn = $("#btnStartSession");
+    // Guard: cegah start jika masih ada antrian aktif
+    if (QS.queue.length > 0) {
+        toast("Masih ada antrian. Silakan bergabung ke antrian.");
+        return;
+    }
+    btn.disabled = true; btn.textContent = "Memulai...";
+    try {
+        await SessionStore.start(cur, (profile.get().name || "").trim());
+        await refreshAll(true);
+        toast("Sesi dimulai. Selesai dalam " + CONFIG.SESSION_MINUTES + " menit.", true);
+    } catch (e) { toast("Gagal memulai sesi. Coba lagi."); }
+    finally { btn.disabled = false; btn.textContent = "Mulai Menggunakan"; }
+}
+async function handleEndSession() {
+    const btn = $("#btnEndSession");
+    btn.disabled = true; btn.textContent = "Mengakhiri...";
+    try {
+        await SessionStore.end(cur, "user");
+        const queue = await QueueStore.load(cur);
+        const frontW = queue.find(q => q.status === "waiting"), frontR = queue.find(q => q.status === "ready");
+        if (!frontR && frontW) {
+            await QueueStore.markReady(frontW.id);
+            if (frontW.session_id === CLIENT_SESSION_ID) toast("Giliran kamu tiba! Tekan konfirmasi untuk mulai.", true);
+        }
+        await refreshAll(true);
+        toast("Sesi selesai. Setrika bebas digunakan lagi.", true);
+        stopTimers();
+    } catch (e) { toast("Gagal mengakhiri sesi. Coba lagi."); }
+    finally { btn.disabled = false; btn.textContent = "Selesai Menggunakan"; }
+}
+async function handleConfirmTurn() {
+    const btn = $("#btnConfirmTurn"), myEntry = myQueueEntry();
+    if (!myEntry) return;
+    btn.disabled = true; btn.textContent = "Memulai...";
+    try {
+        await QueueStore.markDone(myEntry.id);
+        const userName = myEntry.user_name || (profile.get().name || "").trim();
+        await SessionStore.start(cur, userName);
+
+        // Jika antrean mencantumkan kamar (misal profile.room atau dari user_name "Kamar 270..."),
+        // pindahkan lokasi setrika secara otomatis ke kamar tersebut.
+        const L = curL();
+        let targetRoomId = profile.get().room || null;
+        if (!targetRoomId && myEntry.user_name) {
+            const m = myEntry.user_name.match(/Kamar\s+([A-Za-z0-9]+)/i);
+            if (m) {
+                const found = roomsOf(L).find(r => r.id === m[1] || r.label.toLowerCase() === m[1].toLowerCase());
+                if (found) targetRoomId = found.id;
+            }
+        }
+
+        if (targetRoomId) {
+            const newLoc = "room:" + targetRoomId;
+            const now = Date.now();
+            const fresh = await Store.load(cur);
+            const next = {
+                loc: newLoc,
+                name: userName,
+                at: now,
+                history: [{ loc: newLoc, name: userName, at: now }, ...(fresh.history || [])].slice(0, CONFIG.HISTORY_MAX)
+            };
+            await Store.save(cur, next);
+            S = await Store.load(cur);
+        }
+
+        clearInterval(confirmTimerInterval);
+        await refreshAll(true);
+        toast("Sesi dimulai. Setrika otomatis tercatat di kamarmu!", true);
+    } catch (e) { toast("Gagal mengkonfirmasi giliran. Coba lagi."); }
+    finally { btn.disabled = false; btn.textContent = "Mulai Menggunakan (Giliran Saya)"; }
+}
+
+/* ===== Aksi Antrian ===== */
+async function handleJoinQueue(e) {
+    e.preventDefault();
+    const roomInput = $("#queueRoom"), nameInput = $("#queueName");
+    const errEl = $("#queueErr") || $("#queueNameErr"), submitBtn = $("#btnQueueSubmit");
+    
+    const roomId = (roomInput ? roomInput.value : "").trim();
+    const name = nameInput.value.replace(/\s+/g, " ").trim();
+
+    if (!roomId) {
+        errEl.textContent = "Silakan pilih kamarmu terlebih dahulu.";
+        if (roomInput) roomInput.focus();
+        return;
+    }
+
+    const L = curL();
+    const rObj = roomsOf(L).find(r => r.id === roomId);
+    const roomLabel = rObj ? rObj.label : roomId;
+    const labelRoom = `Kamar ${roomLabel}`;
+    const displayIdentity = name ? `${labelRoom} (${name})` : labelRoom;
+
+    errEl.textContent = "";
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Mendaftar...";
+
+    try {
+        await QueueStore.join(cur, displayIdentity);
+        profile.set({ ...profile.get(), room: roomId, name });
+        $("#queueJoinForm").hidden = true;
+        nameInput.value = "";
+        await refreshAll(true);
+        const myEntry = myQueueEntry();
+        // Tampilkan nomor berdasarkan posisi di array (idx+1), bukan queue_number dari DB
+        const posInQueue = QS.queue.findIndex(q => q.session_id === CLIENT_SESSION_ID) + 1;
+        toast(`Berhasil masuk antrian! Nomor: ${posInQueue > 0 ? posInQueue : "-"}`, true);
+        $("#announce").textContent = "Kamu sudah masuk antrian.";
+    } catch (e) {
+        errEl.textContent = e.message === "ALREADY_IN_QUEUE" ? "Kamu sudah ada di antrian ini." : "Gagal mendaftar. Cek koneksi internet.";
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Ambil Antrian";
+    }
+}
+async function handleCancelQueue() {
+    const myEntry = myQueueEntry(); if (!myEntry) return;
+    const btn = $("#btnCancelQueue");
+    btn.disabled = true; btn.textContent = "Membatalkan...";
+    try {
+        await QueueStore.cancel(myEntry.id);
+        await refreshAll(true);
+        toast("Antrianmu berhasil dibatalkan.");
+    } catch (e) { toast("Gagal membatalkan antrian. Coba lagi."); }
+    finally { btn.disabled = false; btn.textContent = "Batalkan Antrianku"; }
 }
 
 /* ===== Toast ===== */
@@ -509,27 +896,59 @@ function toast(t, ok) {
     $("#toastTxt").textContent = t;
     el.querySelector(".ic").hidden = !ok;
     el.classList.add("show");
-    clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("show"), 2800);
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("show"), 3200);
 }
 
 /* ===== Event ===== */
 $("#btnUpdate").addEventListener("click", openPick);
+$("#btnStartSession").addEventListener("click", handleStartSession);
+$("#btnEndSession").addEventListener("click", handleEndSession);
+$("#btnConfirmTurn").addEventListener("click", handleConfirmTurn);
+$("#btnJoinQueue").addEventListener("click", () => {
+    const form = $("#queueJoinForm");
+    form.hidden = !form.hidden;
+    if (!form.hidden) {
+        const prof = profile.get();
+        const roomIn = $("#queueRoom");
+        const nameIn = $("#queueName");
+        if (roomIn) {
+            roomIn.value = prof.room || "";
+            if (!prof.room) roomIn.focus();
+            else if (nameIn) nameIn.focus();
+        } else if (nameIn) {
+            nameIn.focus();
+        }
+        if (nameIn) nameIn.value = prof.name || "";
+    }
+});
+$("#btnCancelQueue").addEventListener("click", handleCancelQueue);
 $("#lorongSel").addEventListener("change", e => selectLorong(e.target.value, false));
-$("#banner").addEventListener("click", e => { if (e.target.closest("#btnRetry")) refresh(false); });
+$("#banner").addEventListener("click", e => { if (e.target.closest("#btnRetry")) refreshAll(false); });
 $("#btnMore").addEventListener("click", () => {
     showAllHist = !showAllHist;
-    const m = $("#histMore"); if (m) m.classList.toggle("open", showAllHist);
-    syncMore();
+    const m = $("#histMore"); if (m) m.classList.toggle("open", showAllHist); syncMore();
 });
-
 document.querySelector(".floor").addEventListener("click", e => {
     const b = e.target.closest(".room"); if (!b) return;
+    if (isSessionActive(QS.session)) {
+        toast("Setrika sedang digunakan. Lokasi tidak bisa dipindahkan sekarang.");
+        return;
+    }
     if (loading && !loaded) { toast("Data masih dimuat. Coba lagi sebentar."); return; }
     const loc = "room:" + b.dataset.room;
     if (S.loc === loc) { toast("Setrika sudah tercatat di " + locText(loc, curL()) + "."); return; }
     openConfirm(loc);
 });
-
+$("#queueBody").addEventListener("click", async e => {
+    const cancelBtn = e.target.closest("[data-cancel-qid]"); if (!cancelBtn) return;
+    cancelBtn.disabled = true;
+    try {
+        await QueueStore.cancel(cancelBtn.dataset.cancelQid);
+        await refreshAll(true); toast("Antrian dibatalkan.");
+    } catch (ex) { toast("Gagal membatalkan. Coba lagi."); cancelBtn.disabled = false; }
+});
+$("#queueJoinForm").addEventListener("submit", handleJoinQueue);
+$("#btnQueueCancel").addEventListener("click", () => { $("#queueJoinForm").hidden = true; });
 $("#q").addEventListener("input", renderOpts);
 $("#opts").addEventListener("click", e => {
     const b = e.target.closest(".opt"); if (!b || b.disabled) return;
@@ -543,8 +962,7 @@ $("#otherBox").addEventListener("submit", e => {
     const r = validateOther($("#otherIn").value);
     if (r.error) { $("#otherErr").textContent = r.error; $("#otherIn").focus(); return; }
     if (r.loc === S.loc) { $("#otherErr").textContent = "Setrika sudah tercatat di lokasi itu."; return; }
-    $("#otherErr").textContent = "";
-    openConfirm(r.loc);
+    $("#otherErr").textContent = ""; openConfirm(r.loc);
 });
 $("#pkCancel").addEventListener("click", closeDialog);
 $("#cfCancel").addEventListener("click", closeDialog);
@@ -552,20 +970,15 @@ $("#cfBack").addEventListener("click", () => { renderOpts(); showPane("pick"); }
 $("#cfOk").addEventListener("click", submitConfirm);
 $("#fName").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); submitConfirm(); } });
 dlg.addEventListener("click", e => { if (e.target === dlg) closeDialog(); });
-dlg.addEventListener("cancel", e => { e.preventDefault(); closeDialog(); });   // tombol Escape ikut animasi tutup
+dlg.addEventListener("cancel", e => { e.preventDefault(); closeDialog(); });
 
 /* ===== Mulai ===== */
 (function init() {
     const m = /[#&]l=([^&]+)/.exec(location.hash);
-    render();
+    renderAll();
     selectLorong(m ? decodeURIComponent(m[1]) : cur, true);
     setInterval(() => { if (loaded) { renderStatus(); renderHist(); } }, 30000);
-
-    if (Store.mode === "cloud") {
-        setupRealtime();
-    } else {
-        window.addEventListener("storage", () => refresh(true));
-    }
-
-    document.addEventListener("visibilitychange", () => { if (!document.hidden && !dlg.open) refresh(true); });
+    if (Store.mode === "cloud") { setupRealtime(); }
+    else { window.addEventListener("storage", () => refresh(true)); }
+    document.addEventListener("visibilitychange", () => { if (!document.hidden && !dlg.open) refreshAll(true); });
 })();

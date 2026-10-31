@@ -26,6 +26,16 @@
             <path d="M4.5 10.5l3.6 3.6 7.4-8" fill="none" stroke="currentColor" stroke-width="2.4"
                 stroke-linecap="round" stroke-linejoin="round" />
         </symbol>
+        <symbol id="i-clock" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>
+            <path d="M12 7v5l3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </symbol>
+        <symbol id="i-x" viewBox="0 0 20 20">
+            <path d="M5 5l10 10M15 5l-10 10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        </symbol>
+        <symbol id="i-play" viewBox="0 0 20 20">
+            <path d="M6 4l12 8-12 8V4z" fill="currentColor"/>
+        </symbol>
     </svg>
     <noscript>
         <p style="padding:16px">SetrikaMap membutuhkan JavaScript untuk berjalan.</p>
@@ -55,11 +65,41 @@
                     <h2 id="stQ">Setrika sekarang ada di mana?</h2>
                 </div>
                 <div class="stage" id="stBody"></div>
-                <button type="button" class="btn primary block" id="btnUpdate">Perbarui Lokasi</button>
+
+                <!-- Sesi aktif: tampil jika setrika sedang digunakan -->
+                <div id="sessionBox" hidden>
+                    <div class="session-bar" id="sessionBar"></div>
+                </div>
+
+                <div class="hero-actions" id="heroActions">
+                    <button type="button" class="btn primary block" id="btnUpdate">Perbarui Lokasi</button>
+                    <button type="button" class="btn block" id="btnStartSession" hidden>Mulai Menggunakan</button>
+                    <button type="button" class="btn block session-end" id="btnEndSession" hidden>Selesai Menggunakan</button>
+                    <button type="button" class="btn block" id="btnJoinQueue" hidden>Ambil Antrian</button>
+                    <button type="button" class="btn block" id="btnCancelQueue" hidden>Batalkan Antrianku</button>
+                    <button type="button" class="btn primary block" id="btnConfirmTurn" hidden>Mulai Menggunakan (Giliran Saya)</button>
+                </div>
                 <p class="note">Lokasi diperbarui manual oleh penghuni, bukan pelacakan otomatis.</p>
             </section>
 
-            <section class="plan enter" style="--i:3" aria-labelledby="dnH">
+            <!-- Antrian -->
+            <section class="queue-section enter" style="--i:3" id="queueSection" aria-labelledby="queueH">
+                <h2 class="sec-h" id="queueH">Antrian Penggunaan Setrika</h2>
+                <div id="queueBody"></div>
+                <form id="queueJoinForm" hidden novalidate>
+                    <label class="lbl" for="queueRoom">Nomor Kamar</label>
+                    <select id="queueRoom" class="sel-input" required>
+                        <option value="">-- Pilih Kamar --</option>
+                    </select>
+                    <label class="lbl" for="queueName" style="margin-top:12px">Nama (opsional)</label>
+                    <input id="queueName" type="text" maxlength="30" autocomplete="name" placeholder="Contoh: Rani">
+                    <p class="err" id="queueErr" role="alert"></p>
+                    <button type="submit" class="btn primary block" id="btnQueueSubmit">Ambil Antrian</button>
+                    <button type="button" class="link" id="btnQueueCancel">Batalkan</button>
+                </form>
+            </section>
+
+            <section class="plan enter" style="--i:4" aria-labelledby="dnH">
                 <h2 class="sec-h" id="dnH">Denah <span class="where" id="planName"></span></h2>
                 <p class="hint">Setrika pindah ke kamarmu? Ketuk nomor kamar di bawah.</p>
                 <div class="floor">
@@ -69,14 +109,14 @@
                 </div>
             </section>
 
-            <section class="history enter" style="--i:4" aria-labelledby="hsH">
+            <section class="history enter" style="--i:5" aria-labelledby="hsH">
                 <h2 class="sec-h" id="hsH">Riwayat Lokasi</h2>
                 <div id="hist"></div>
                 <button type="button" class="link" id="btnMore" aria-expanded="false" aria-controls="histMore"
                     hidden></button>
             </section>
 
-            <details class="help enter" style="--i:5">
+            <details class="help enter" style="--i:6">
                 <summary>Cara pakai</summary>
                 <ol>
                     <li>Cek lokasi dan waktu pembaruan di bagian atas.</li>
