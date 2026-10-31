@@ -484,8 +484,8 @@ function renderPlan() {
     const pop = prevRoomKey !== undefined && roomNow !== null && roomNow !== prevRoomKey;
     const btn = ([id, label]) => {
         const here = roomNow === id;
-        return `<button type="button" class="room${here ? " here" : ""}${here && pop ? " pop" : ""}" data-room="${esc(id)}" aria-label="Kamar ${esc(label)}${here ? ", setrika ada di sini" : ""}">
-      <span>${esc(label)}</span>${here ? `<small><svg class="ic" aria-hidden="true"><use href="#i-iron"/></svg>Setrika di sini</small>` : ""}</button>`;
+        return `<div class="room${here ? " here" : ""}${here && pop ? " pop" : ""}" data-room="${esc(id)}">
+      <span>${esc(label)}</span>${here ? `<small><svg class="ic" aria-hidden="true"><use href="#i-iron"/></svg>Setrika di sini</small>` : ""}</div>`;
     };
     const cell = item => item === null ? '<div class="room spacer" aria-hidden="true"></div>' : btn(item);
     $("#colL").innerHTML = L.left.map(cell).join("");
@@ -552,28 +552,33 @@ function renderHeroButtons() {
     const activeByMe = active && isMySession(sess);
     const hasQueue = QS.queue.length > 0;
 
-    // Kunci tombol "Perbarui Lokasi" jika setrika sedang digunakan
-    const btnUpdate = $("#btnUpdate");
-    if (btnUpdate) {
-        btnUpdate.disabled = active;
-        btnUpdate.title = active ? "Setrika sedang digunakan, lokasi terkunci sementara" : "";
-    }
-
     if (!CLOUD) {
         ["#btnStartSession","#btnEndSession","#btnJoinQueue","#btnCancelQueue","#btnConfirmTurn"]
-            .forEach(id => $(id).hidden = true);
+            .forEach(id => {
+                const el = $(id);
+                if (el) el.hidden = true;
+            });
         return;
     }
-    // Mulai Menggunakan: tampil hanya jika tidak ada sesi aktif DAN tidak ada antrian DAN saya tidak di antrian
-    $("#btnStartSession").hidden = active || hasQueue || !!myEntry;
+    // Mulai Menggunakan: tampil jika tidak ada sesi aktif DAN tidak ada antrian DAN saya tidak di antrian
+    const btnStart = $("#btnStartSession");
+    if (btnStart) btnStart.hidden = active || hasQueue || !!myEntry;
+
     // Selesai: saya yang memakai
-    $("#btnEndSession").hidden = !activeByMe;
-    // Ambil Antrian: ada sesi orang lain ATAU ada antrian (tapi setrika tidak dipakai oleh saya), dan saya belum di antrian
-    $("#btnJoinQueue").hidden = !((activeByOther || (hasQueue && !activeByMe)) && !myEntry);
+    const btnEnd = $("#btnEndSession");
+    if (btnEnd) btnEnd.hidden = !activeByMe;
+
+    // Ambil Antrian: ada sesi orang lain ATAU ada antrian (tapi bukan sesi saya), dan saya belum antre
+    const btnJoin = $("#btnJoinQueue");
+    if (btnJoin) btnJoin.hidden = !((activeByOther || (hasQueue && !activeByMe)) && !myEntry);
+
     // Batalkan Antrian: saya di antrian waiting
-    $("#btnCancelQueue").hidden = !(myEntry && myEntry.status === "waiting");
+    const btnCancel = $("#btnCancelQueue");
+    if (btnCancel) btnCancel.hidden = !(myEntry && myEntry.status === "waiting");
+
     // Konfirmasi Giliran: saya ready DAN tidak ada sesi aktif lain
-    $("#btnConfirmTurn").hidden = !(iAmReady && !active);
+    const btnConfirm = $("#btnConfirmTurn");
+    if (btnConfirm) btnConfirm.hidden = !(iAmReady && !active);
 }
 
 function renderQueue() {
@@ -1134,7 +1139,8 @@ function toast(t, ok) {
 }
 
 /* ===== Event ===== */
-$("#btnUpdate").addEventListener("click", openPick);
+const btnUpd = $("#btnUpdate");
+if (btnUpd) btnUpd.addEventListener("click", openPick);
 $("#btnStartSession").addEventListener("click", openStartSessionDialog);
 $("#ssCancel").addEventListener("click", closeDialog);
 $("#ssOk").addEventListener("click", submitStartSession);
@@ -1169,17 +1175,7 @@ $("#btnMore").addEventListener("click", () => {
     showAllHist = !showAllHist;
     const m = $("#histMore"); if (m) m.classList.toggle("open", showAllHist); syncMore();
 });
-document.querySelector(".floor").addEventListener("click", e => {
-    const b = e.target.closest(".room"); if (!b) return;
-    if (isSessionActive(QS.session)) {
-        toast("Setrika sedang digunakan. Lokasi tidak bisa dipindahkan sekarang.");
-        return;
-    }
-    if (loading && !loaded) { toast("Data masih dimuat. Coba lagi sebentar."); return; }
-    const loc = "room:" + b.dataset.room;
-    if (S.loc === loc) { toast("Setrika sudah tercatat di " + locText(loc, curL()) + "."); return; }
-    openConfirm(loc);
-});
+// Denah kamar sekarang murni sebagai indikator visual posisi setrika
 $("#queueBody").addEventListener("click", async e => {
     const cancelBtn = e.target.closest("[data-cancel-qid]"); if (!cancelBtn) return;
     cancelBtn.disabled = true;

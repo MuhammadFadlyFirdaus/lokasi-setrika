@@ -72,14 +72,13 @@
                 </div>
 
                 <div class="hero-actions" id="heroActions">
-                    <button type="button" class="btn primary block" id="btnUpdate">Perbarui Lokasi</button>
-                    <button type="button" class="btn block" id="btnStartSession" hidden>Mulai Menggunakan</button>
+                    <button type="button" class="btn primary block" id="btnStartSession" hidden>Mulai Menggunakan</button>
                     <button type="button" class="btn block session-end" id="btnEndSession" hidden>Selesai Menggunakan</button>
-                    <button type="button" class="btn block" id="btnJoinQueue" hidden>Ambil Antrian</button>
+                    <button type="button" class="btn primary block" id="btnJoinQueue" hidden>Ambil Antrian</button>
                     <button type="button" class="btn block" id="btnCancelQueue" hidden>Batalkan Antrianku</button>
                     <button type="button" class="btn primary block" id="btnConfirmTurn" hidden>Mulai Menggunakan (Giliran Saya)</button>
                 </div>
-                <p class="note">Lokasi diperbarui manual oleh penghuni, bukan pelacakan otomatis.</p>
+                <p class="note">Lokasi berpindah otomatis saat penghuni mulai dan selesai menggunakan setrika.</p>
             </section>
 
             <!-- Antrian -->
@@ -101,7 +100,6 @@
 
             <section class="plan enter" style="--i:4" aria-labelledby="dnH">
                 <h2 class="sec-h" id="dnH">Denah <span class="where" id="planName"></span></h2>
-                <p class="hint">Setrika pindah ke kamarmu? Ketuk nomor kamar di bawah.</p>
                 <div class="floor">
                     <div class="col" id="colL"></div>
                     <div class="corridor" aria-hidden="true"><span>Lorong</span></div>
@@ -124,7 +122,6 @@
                     <li><strong>Ambil Antrian (Jika Sedang Dipakai):</strong> Tekan <em>Ambil Antrian</em> dan pilih nomor kamarmu. Cek nomor urut serta perkiraan waktu tunggu pada daftar antrean.</li>
                     <li><strong>Giliran Tiba (2 Menit):</strong> Saat giliranmu tiba, bunyi notifikasi akan berdering. Segera tekan <em>Mulai Menggunakan (Giliran Saya)</em> dalam batas waktu 2 menit agar giliran tidak terlewat.</li>
                     <li><strong>Selesai Dipakai:</strong> Setelah selesai menyetrika, tekan <em>Selesai Menggunakan</em>, lalu pilih apakah setrika dikembalikan ke <em>Tempat penyimpanan</em> atau dioper ke kamar antrean berikutnya.</li>
-                    <li><strong>Perbarui Lokasi Manual:</strong> Hanya digunakan jika setrika dipindahkan di luar sesi otomatis atau ada kekeliruan posisi.</li>
                 </ol>
                 <p>Karena digunakan bersama, harap segera menekan "Selesai Menggunakan" setelah selesai menyetrika agar giliran berikutnya dapat segera memakai.</p>
             </details>
