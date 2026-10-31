@@ -10,6 +10,7 @@ const CONFIG = {
     HISTORY_MAX: 20,
     HISTORY_SHOWN: 6,
     SESSION_MINUTES: 15,
+    GRACE_MINUTES: 1,
     CONFIRM_MINUTES: 2,
     LORONG: [
         {
@@ -242,13 +243,18 @@ const SessionStore = {
         const rows = await supaRest.get("iron_session", `lorong_id=eq.${encodeURIComponent(lorongId)}&select=*`);
         if (!rows.length) return null;
         const s = rows[0];
-        // Tidak ada auto-timeout paksa; sesi aktif sampai pengguna menekan "Selesai Menggunakan"
-        // (atau jika sesi sudah menggantung lebih dari 12 jam sebagai pembersihan darurat)
+        // Sesi otomatis diselesaikan jika melewati 15 menit + 1 menit delay (grace period)
         if (!s.session_end_at) {
             const elapsed = Date.now() - new Date(s.session_start).getTime();
-            if (elapsed > 12 * 3600000) {
-                try { await supaRest.patch("iron_session", { lorong_id: lorongId }, { session_end_at: new Date().toISOString(), ended_by: "timeout_cleanup" }); } catch(e) {}
-                return { ...s, session_end_at: new Date().toISOString(), ended_by: "timeout_cleanup" };
+            const totalMaxMs = (CONFIG.SESSION_MINUTES + CONFIG.GRACE_MINUTES) * 60000;
+            if (elapsed >= totalMaxMs) {
+                try {
+                    await supaRest.patch("iron_session", { lorong_id: lorongId }, {
+                        session_end_at: new Date().toISOString(),
+                        ended_by: "timeout_auto"
+                    });
+                } catch(e) {}
+                return { ...s, session_end_at: new Date().toISOString(), ended_by: "timeout_auto" };
             }
         }
         return s;
@@ -260,6 +266,16 @@ const SessionStore = {
             user_name: userName, session_start: now, session_end_at: null, ended_by: ""
         });
         return rows[0];
+    },
+    async extend(lorongId, addMinutes = 5) {
+        // Mengundur session_start agar sesi bertambah durasinya
+        const current = await this.load(lorongId);
+        if (!current || !isSessionActive(current)) return;
+        const currentStart = new Date(current.session_start).getTime();
+        const newStart = new Date(currentStart + addMinutes * 60000).toISOString();
+        await supaRest.patch("iron_session", { lorong_id: lorongId }, {
+            session_start: newStart
+        });
     },
     async end(lorongId, reason = "user") {
         await supaRest.patch("iron_session", { lorong_id: lorongId }, { session_end_at: new Date().toISOString(), ended_by: reason });
@@ -337,10 +353,13 @@ let sessionTimerInterval = null;
 let confirmTimerInterval = null;
 
 /* ===== Helper State ===== */
+let sessionAlertTriggered = false;
+
 function isSessionActive(sess) {
     if (!sess || sess.session_end_at) return false;
-    // Sesi tetap aktif selama belum diakhiri manual (maksimal proteksi pembersihan darurat 12 jam)
-    return (Date.now() - new Date(sess.session_start).getTime()) < 12 * 3600000;
+    // Sesi aktif selama belum lewat batas 15 menit + 1 menit delay
+    const elapsed = Date.now() - new Date(sess.session_start).getTime();
+    return elapsed < (CONFIG.SESSION_MINUTES + CONFIG.GRACE_MINUTES) * 60000;
 }
 function isMySession(sess) { return sess && sess.session_id === CLIENT_SESSION_ID; }
 function myQueueEntry() { return QS.queue.find(q => q.session_id === CLIENT_SESSION_ID) || null; }
@@ -358,24 +377,76 @@ function startSessionTimer(sess) {
     if (!sess || !isSessionActive(sess)) return;
     const startMs = new Date(sess.session_start).getTime();
     const estMs = CONFIG.SESSION_MINUTES * 60000;
+    const graceMs = CONFIG.GRACE_MINUTES * 60000;
+    const totalLimitMs = estMs + graceMs;
+
     sessionTimerInterval = setInterval(() => {
         const elapsed = Date.now() - startMs;
-        const remaining = estMs - elapsed;
+        const remainingToEst = estMs - elapsed;
+        const remainingTotal = totalLimitMs - elapsed;
         const bar = $("#sessionBar");
-        if (!bar) { clearInterval(sessionTimerInterval); return; }
-        const timerEl = bar.querySelector(".sb-timer");
-        if (timerEl) {
-            if (remaining > 0) {
-                timerEl.textContent = fmtCountdown(remaining);
-                timerEl.classList.toggle("urgent", remaining < 120000);
-            } else {
-                // Melewati estimasi 15 menit: hitung overtime (+mm:ss) tanpa mematikan sesi
-                const overtime = Math.abs(remaining);
-                timerEl.textContent = "+" + fmtCountdown(overtime);
-                timerEl.classList.add("urgent");
+
+        // Periksa apakah waktu 15 menit sudah tercapai
+        if (remainingToEst <= 0 && remainingTotal > 0) {
+            // Periode delay 1 menit (grace period)
+            const graceSecLeft = Math.max(1, Math.ceil(remainingTotal / 1000));
+            if (bar) {
+                const timerEl = bar.querySelector(".sb-timer");
+                if (timerEl) {
+                    timerEl.textContent = `Auto-selesai: ${graceSecLeft}s`;
+                    timerEl.classList.add("urgent");
+                }
+            }
+
+            // Jika ini sesi saya dan dialog extend belum pernah muncul
+            if (isMySession(sess) && !sessionAlertTriggered) {
+                sessionAlertTriggered = true;
+                playTurnSound();
+                notifyTurn("⏰ Waktu 15 Menit Telah Habis!", "Sesi akan selesai otomatis dalam 1 menit jika tidak ditambah.");
+                showPane("extendSession");
+                openDialog();
+            }
+
+            const extCd = $("#extCountdown");
+            if (extCd) extCd.textContent = `${graceSecLeft} detik`;
+            return;
+        }
+
+        // Jika melewati total waktu 15 menit + 1 menit delay: sistem otomatis menyelesaikan sesi
+        if (remainingTotal <= 0) {
+            clearInterval(sessionTimerInterval);
+            finishAutoEndSession();
+            return;
+        }
+
+        // Tampilan normal selama 15 menit berjalan
+        if (bar) {
+            const timerEl = bar.querySelector(".sb-timer");
+            if (timerEl) {
+                timerEl.textContent = fmtCountdown(remainingToEst);
+                timerEl.classList.toggle("urgent", remainingToEst < 120000);
             }
         }
     }, 1000);
+}
+
+async function finishAutoEndSession() {
+    closeDialog();
+    toast("Waktu habis! Sesi telah diselesaikan otomatis.", true);
+    try {
+        await SessionStore.end(cur, "timeout_auto");
+        const queue = await QueueStore.load(cur);
+        const frontW = queue.find(q => q.status === "waiting"), frontR = queue.find(q => q.status === "ready");
+        if (!frontR && frontW) {
+            await QueueStore.markReady(frontW.id);
+            if (frontW.session_id === CLIENT_SESSION_ID) {
+                toast("Giliran kamu tiba! Tekan konfirmasi untuk mulai.", true);
+                notifyTurn("✨ Giliran Kamu Tiba!", "Setrika siap digunakan. Segera konfirmasi dalam 2 menit!");
+            }
+        }
+        await refreshAll(true);
+        stopTimers();
+    } catch(e) { }
 }
 
 function startConfirmTimer(readyEntry) {
@@ -530,12 +601,24 @@ function renderSessionBox() {
     const box = $("#sessionBox"), bar = $("#sessionBar"), sess = QS.session;
     const active = isSessionActive(sess);
     box.hidden = !active;
-    if (!active) return;
+    if (!active) {
+        sessionAlertTriggered = false;
+        return;
+    }
     const startMs = new Date(sess.session_start).getTime();
     const elapsed = Date.now() - startMs;
     const remaining = CONFIG.SESSION_MINUTES * 60000 - elapsed;
     const who = sess.user_name || "Seseorang";
-    const timerDisplay = remaining > 0 ? fmtCountdown(remaining) : ("+" + fmtCountdown(Math.abs(remaining)));
+    const totalRemaining = (CONFIG.SESSION_MINUTES + CONFIG.GRACE_MINUTES) * 60000 - elapsed;
+    
+    let timerDisplay = "";
+    if (remaining > 0) {
+        timerDisplay = fmtCountdown(remaining);
+    } else {
+        const graceSecLeft = Math.max(1, Math.ceil(totalRemaining / 1000));
+        timerDisplay = `Auto-selesai: ${graceSecLeft}s`;
+    }
+
     bar.innerHTML = `
         <div class="sb-label">
             <svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg>
@@ -785,10 +868,13 @@ function showPane(name) {
     if (pStart) pStart.hidden = name !== "startSession";
     const pEnd = $("#paneEndSession");
     if (pEnd) pEnd.hidden = name !== "endSession";
+    const pExt = $("#paneExtendSession");
+    if (pExt) pExt.hidden = name !== "extendSession";
 
     const title = name === "pick" ? $("#pkTitle") :
         (name === "confirm" ? $("#cfTitle") :
-        (name === "startSession" ? $("#ssTitle") : $("#esTitle")));
+        (name === "startSession" ? $("#ssTitle") :
+        (name === "extendSession" ? $("#extTitle") : $("#esTitle"))));
     if (title) {
         dlg.setAttribute("aria-labelledby", title.id);
         title.focus();
@@ -967,6 +1053,22 @@ async function submitStartSession() {
         btn.disabled = false; btn.textContent = "Mulai Pakai";
     }
 }
+async function handleExtendSession(addMinutes = 5) {
+    const btn = $("#btnExtendAdd5");
+    btn.disabled = true;
+    try {
+        await SessionStore.extend(cur, addMinutes);
+        sessionAlertTriggered = false;
+        closeDialog();
+        await refreshAll(true);
+        toast(`Waktu pemakaian berhasil ditambah +${addMinutes} menit!`, true);
+    } catch (e) {
+        toast("Gagal menambah waktu. Coba lagi.");
+    } finally {
+        btn.disabled = false;
+    }
+}
+
 function openEndSessionDialog() {
     showPane("endSession");
     openDialog();
@@ -1149,6 +1251,11 @@ $("#btnEndSession").addEventListener("click", openEndSessionDialog);
 $("#btnEndReturnStorage").addEventListener("click", () => finishEndSession("storage"));
 $("#btnEndKeepRoom").addEventListener("click", () => finishEndSession("keep"));
 $("#btnEndCancel").addEventListener("click", closeDialog);
+$("#btnExtendAdd5").addEventListener("click", () => handleExtendSession(5));
+$("#btnExtendDone").addEventListener("click", () => {
+    closeDialog();
+    openEndSessionDialog();
+});
 $("#btnConfirmTurn").addEventListener("click", handleConfirmTurn);
 $("#btnJoinQueue").addEventListener("click", () => {
     requestNotificationPermission();
