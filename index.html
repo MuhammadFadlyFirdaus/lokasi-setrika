@@ -85,17 +85,6 @@
             <section class="queue-section enter" style="--i:3" id="queueSection" aria-labelledby="queueH">
                 <h2 class="sec-h" id="queueH">Antrian Penggunaan Setrika</h2>
                 <div id="queueBody"></div>
-                <form id="queueJoinForm" hidden novalidate>
-                    <label class="lbl" for="queueRoom">Nomor Kamar</label>
-                    <select id="queueRoom" class="sel-input" required>
-                        <option value="">-- Pilih Kamar --</option>
-                    </select>
-                    <label class="lbl" for="queueName" style="margin-top:12px">Nama (opsional)</label>
-                    <input id="queueName" type="text" maxlength="30" autocomplete="name" placeholder="Contoh: Rani">
-                    <p class="err" id="queueErr" role="alert"></p>
-                    <button type="submit" class="btn primary block" id="btnQueueSubmit">Ambil Antrian</button>
-                    <button type="button" class="link" id="btnQueueCancel">Batalkan</button>
-                </form>
             </section>
 
             <section class="plan enter" style="--i:4" aria-labelledby="dnH">
@@ -174,6 +163,24 @@
             <div class="actions">
                 <button type="button" class="btn" id="ssCancel">Batalkan</button>
                 <button type="button" class="btn primary" id="ssOk">Mulai Pakai</button>
+            </div>
+        </section>
+        <section class="pane" id="paneJoinQueue" hidden>
+            <h2 id="jqTitle" tabindex="-1">Ambil Antrian Setrika</h2>
+            <p class="hint">Ketuk kamarmu pada denah lorong di bawah:</p>
+            <div class="floor dlg-floor" id="dlgQueueFloor">
+                <div class="col" id="dlgQueueColL"></div>
+                <div class="corridor" aria-hidden="true"><span>Lorong</span></div>
+                <div class="col" id="dlgQueueColR"></div>
+            </div>
+            <div class="field" style="margin-top:14px">
+                <label class="lbl" for="jqName">Nama (opsional)</label>
+                <input id="jqName" type="text" maxlength="30" autocomplete="name" placeholder="Contoh: Rani">
+            </div>
+            <p class="err" id="jqErr" role="alert"></p>
+            <div class="actions">
+                <button type="button" class="btn" id="jqCancel">Batalkan</button>
+                <button type="button" class="btn primary" id="jqOk">Ambil Antrian</button>
             </div>
         </section>
         <section class="pane" id="paneExtendSession" hidden>

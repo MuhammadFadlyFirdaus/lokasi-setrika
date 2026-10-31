@@ -729,22 +729,7 @@ function renderQueue() {
 }
 
 function renderQueueJoinForm() {
-    const form = $("#queueJoinForm"), myEntry = myQueueEntry(), sess = QS.session;
-    const activeByOther = isSessionActive(sess) && !isMySession(sess);
-    // Tampilkan form jika: setrika dipakai orang lain ATAU sudah ada antrian,
-    // dan user belum di antrian dan bukan pemilik sesi aktif
-    const canJoin = (activeByOther || QS.queue.length > 0) && !myEntry && !isMySession(sess);
-    form.hidden = !(canJoin && CLOUD);
-
-    // Isi pilihan kamar jika elemen select tersedia
-    const sel = $("#queueRoom");
-    if (sel && curL()) {
-        const rooms = roomsOf(curL());
-        const savedRoom = profile.get().room || "";
-        const currentVal = sel.value || savedRoom;
-        sel.innerHTML = '<option value="">-- Pilih Kamar (270 - 280) --</option>' +
-            rooms.map(r => `<option value="${esc(r.id)}"${r.id === currentVal ? " selected" : ""}>Kamar ${esc(r.label)}</option>`).join("");
-    }
+    // Form inline di halaman utama ditiadakan, diganti popup denah (#paneJoinQueue)
 }
 
 function renderAll() {
@@ -866,6 +851,8 @@ function showPane(name) {
     $("#paneConfirm").hidden = name !== "confirm";
     const pStart = $("#paneStartSession");
     if (pStart) pStart.hidden = name !== "startSession";
+    const pQueue = $("#paneJoinQueue");
+    if (pQueue) pQueue.hidden = name !== "joinQueue";
     const pEnd = $("#paneEndSession");
     if (pEnd) pEnd.hidden = name !== "endSession";
     const pExt = $("#paneExtendSession");
@@ -874,7 +861,8 @@ function showPane(name) {
     const title = name === "pick" ? $("#pkTitle") :
         (name === "confirm" ? $("#cfTitle") :
         (name === "startSession" ? $("#ssTitle") :
-        (name === "extendSession" ? $("#extTitle") : $("#esTitle"))));
+        (name === "joinQueue" ? $("#jqTitle") :
+        (name === "extendSession" ? $("#extTitle") : $("#esTitle")))));
     if (title) {
         dlg.setAttribute("aria-labelledby", title.id);
         title.focus();
@@ -1187,17 +1175,49 @@ async function handleConfirmTurn() {
 }
 
 /* ===== Aksi Antrian ===== */
-async function handleJoinQueue(e) {
-    e.preventDefault();
-    const roomInput = $("#queueRoom"), nameInput = $("#queueName");
-    const errEl = $("#queueErr") || $("#queueNameErr"), submitBtn = $("#btnQueueSubmit");
-    
-    const roomId = (roomInput ? roomInput.value : "").trim();
-    const name = nameInput.value.replace(/\s+/g, " ").trim();
+let selectedQueueRoomId = null;
+
+function renderDlgQueueFloor() {
+    const L = curL();
+    const btn = ([id, label]) => {
+        const selected = selectedQueueRoomId === id;
+        return `<button type="button" class="room dlg-room${selected ? " selected" : ""}" data-dlg-qroom="${esc(id)}">
+            <span>${esc(label)}</span>
+            ${selected ? `<small><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Dipilih</small>` : ""}
+        </button>`;
+    };
+    const cell = item => item === null ? '<div class="room spacer" aria-hidden="true"></div>' : btn(item);
+    const colL = $("#dlgQueueColL"), colR = $("#dlgQueueColR");
+    if (colL) colL.innerHTML = L.left.map(cell).join("");
+    if (colR) colR.innerHTML = L.right.map(cell).join("");
+}
+
+function openJoinQueueDialog() {
+    requestNotificationPermission();
+    if (myQueueEntry()) {
+        toast("Kamu sudah terdaftar di antrian.");
+        return;
+    }
+
+    selectedQueueRoomId = profile.get().room || null;
+    renderDlgQueueFloor();
+
+    const nameIn = $("#jqName");
+    if (nameIn) nameIn.value = profile.get().name || "";
+    const errEl = $("#jqErr");
+    if (errEl) errEl.textContent = "";
+
+    showPane("joinQueue");
+    openDialog();
+}
+
+async function submitJoinQueue() {
+    const nameIn = $("#jqName"), errEl = $("#jqErr"), submitBtn = $("#jqOk");
+    const roomId = selectedQueueRoomId;
+    const name = (nameIn ? nameIn.value : "").replace(/\s+/g, " ").trim();
 
     if (!roomId) {
-        errEl.textContent = "Silakan pilih kamarmu terlebih dahulu.";
-        if (roomInput) roomInput.focus();
+        if (errEl) errEl.textContent = "Silakan ketuk nomor kamarmu pada denah terlebih dahulu.";
         return;
     }
 
@@ -1207,15 +1227,14 @@ async function handleJoinQueue(e) {
     const labelRoom = `Kamar ${roomLabel}`;
     const displayIdentity = name ? `${labelRoom} (${name})` : labelRoom;
 
-    errEl.textContent = "";
+    if (errEl) errEl.textContent = "";
     submitBtn.disabled = true;
     submitBtn.textContent = "Mendaftar...";
 
     try {
         await QueueStore.join(cur, displayIdentity);
         profile.set({ ...profile.get(), room: roomId, name });
-        $("#queueJoinForm").hidden = true;
-        nameInput.value = "";
+        closeDialog();
         await refreshAll(true);
         const myEntry = myQueueEntry();
         // Tampilkan nomor berdasarkan posisi di array (idx+1), bukan queue_number dari DB
@@ -1223,12 +1242,13 @@ async function handleJoinQueue(e) {
         toast(`Berhasil masuk antrian! Nomor: ${posInQueue > 0 ? posInQueue : "-"}`, true);
         $("#announce").textContent = "Kamu sudah masuk antrian.";
     } catch (e) {
-        errEl.textContent = e.message === "ALREADY_IN_QUEUE" ? "Kamu sudah ada di antrian ini." : "Gagal mendaftar. Cek koneksi internet.";
+        if (errEl) errEl.textContent = e.message === "ALREADY_IN_QUEUE" ? "Kamu sudah ada di antrian ini." : "Gagal mendaftar. Cek koneksi internet.";
     } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = "Ambil Antrian";
     }
 }
+
 async function handleCancelQueue() {
     const myEntry = myQueueEntry(); if (!myEntry) return;
     const btn = $("#btnCancelQueue");
@@ -1279,24 +1299,21 @@ $("#btnExtendDone").addEventListener("click", () => {
     openEndSessionDialog();
 });
 $("#btnConfirmTurn").addEventListener("click", handleConfirmTurn);
-$("#btnJoinQueue").addEventListener("click", () => {
-    requestNotificationPermission();
-    const form = $("#queueJoinForm");
-    form.hidden = !form.hidden;
-    if (!form.hidden) {
-        const prof = profile.get();
-        const roomIn = $("#queueRoom");
-        const nameIn = $("#queueName");
-        if (roomIn) {
-            roomIn.value = prof.room || "";
-            if (!prof.room) roomIn.focus();
-            else if (nameIn) nameIn.focus();
-        } else if (nameIn) {
-            nameIn.focus();
-        }
-        if (nameIn) nameIn.value = prof.name || "";
-    }
-});
+$("#btnJoinQueue").addEventListener("click", openJoinQueueDialog);
+$("#jqCancel").addEventListener("click", closeDialog);
+$("#jqOk").addEventListener("click", submitJoinQueue);
+$("#jqName").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); submitJoinQueue(); } });
+const dlgQueueFloor = $("#dlgQueueFloor");
+if (dlgQueueFloor) {
+    dlgQueueFloor.addEventListener("click", e => {
+        const b = e.target.closest("[data-dlg-qroom]");
+        if (!b) return;
+        selectedQueueRoomId = b.dataset.dlgQroom;
+        renderDlgQueueFloor();
+        const errEl = $("#jqErr");
+        if (errEl) errEl.textContent = "";
+    });
+}
 $("#btnCancelQueue").addEventListener("click", handleCancelQueue);
 $("#lorongSel").addEventListener("change", e => selectLorong(e.target.value, false));
 $("#banner").addEventListener("click", e => { if (e.target.closest("#btnRetry")) refreshAll(false); });
@@ -1313,8 +1330,6 @@ $("#queueBody").addEventListener("click", async e => {
         await refreshAll(true); toast("Antrian dibatalkan.");
     } catch (ex) { toast("Gagal membatalkan. Coba lagi."); cancelBtn.disabled = false; }
 });
-$("#queueJoinForm").addEventListener("submit", handleJoinQueue);
-$("#btnQueueCancel").addEventListener("click", () => { $("#queueJoinForm").hidden = true; });
 $("#q").addEventListener("input", renderOpts);
 $("#opts").addEventListener("click", e => {
     const b = e.target.closest(".opt"); if (!b || b.disabled) return;
