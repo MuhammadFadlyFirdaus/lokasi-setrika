@@ -242,11 +242,13 @@ const SessionStore = {
         const rows = await supaRest.get("iron_session", `lorong_id=eq.${encodeURIComponent(lorongId)}&select=*`);
         if (!rows.length) return null;
         const s = rows[0];
+        // Tidak ada auto-timeout paksa; sesi aktif sampai pengguna menekan "Selesai Menggunakan"
+        // (atau jika sesi sudah menggantung lebih dari 12 jam sebagai pembersihan darurat)
         if (!s.session_end_at) {
             const elapsed = Date.now() - new Date(s.session_start).getTime();
-            if (elapsed > CONFIG.SESSION_MINUTES * 60000) {
-                try { await supaRest.patch("iron_session", { lorong_id: lorongId }, { session_end_at: new Date().toISOString(), ended_by: "timeout" }); } catch(e) {}
-                return { ...s, session_end_at: new Date().toISOString(), ended_by: "timeout" };
+            if (elapsed > 12 * 3600000) {
+                try { await supaRest.patch("iron_session", { lorong_id: lorongId }, { session_end_at: new Date().toISOString(), ended_by: "timeout_cleanup" }); } catch(e) {}
+                return { ...s, session_end_at: new Date().toISOString(), ended_by: "timeout_cleanup" };
             }
         }
         return s;
@@ -337,7 +339,8 @@ let confirmTimerInterval = null;
 /* ===== Helper State ===== */
 function isSessionActive(sess) {
     if (!sess || sess.session_end_at) return false;
-    return (Date.now() - new Date(sess.session_start).getTime()) < CONFIG.SESSION_MINUTES * 60000;
+    // Sesi tetap aktif selama belum diakhiri manual (maksimal proteksi pembersihan darurat 12 jam)
+    return (Date.now() - new Date(sess.session_start).getTime()) < 12 * 3600000;
 }
 function isMySession(sess) { return sess && sess.session_id === CLIENT_SESSION_ID; }
 function myQueueEntry() { return QS.queue.find(q => q.session_id === CLIENT_SESSION_ID) || null; }
@@ -354,14 +357,24 @@ function startSessionTimer(sess) {
     stopTimers();
     if (!sess || !isSessionActive(sess)) return;
     const startMs = new Date(sess.session_start).getTime();
-    const limitMs = CONFIG.SESSION_MINUTES * 60000;
+    const estMs = CONFIG.SESSION_MINUTES * 60000;
     sessionTimerInterval = setInterval(() => {
-        const remaining = limitMs - (Date.now() - startMs);
+        const elapsed = Date.now() - startMs;
+        const remaining = estMs - elapsed;
         const bar = $("#sessionBar");
         if (!bar) { clearInterval(sessionTimerInterval); return; }
-        if (remaining <= 0) { clearInterval(sessionTimerInterval); refreshAll(true); return; }
         const timerEl = bar.querySelector(".sb-timer");
-        if (timerEl) { timerEl.textContent = fmtCountdown(remaining); timerEl.classList.toggle("urgent", remaining < 120000); }
+        if (timerEl) {
+            if (remaining > 0) {
+                timerEl.textContent = fmtCountdown(remaining);
+                timerEl.classList.toggle("urgent", remaining < 120000);
+            } else {
+                // Melewati estimasi 15 menit: hitung overtime (+mm:ss) tanpa mematikan sesi
+                const overtime = Math.abs(remaining);
+                timerEl.textContent = "+" + fmtCountdown(overtime);
+                timerEl.classList.add("urgent");
+            }
+        }
     }, 1000);
 }
 
@@ -519,14 +532,16 @@ function renderSessionBox() {
     box.hidden = !active;
     if (!active) return;
     const startMs = new Date(sess.session_start).getTime();
-    const remaining = CONFIG.SESSION_MINUTES * 60000 - (Date.now() - startMs);
+    const elapsed = Date.now() - startMs;
+    const remaining = CONFIG.SESSION_MINUTES * 60000 - elapsed;
     const who = sess.user_name || "Seseorang";
+    const timerDisplay = remaining > 0 ? fmtCountdown(remaining) : ("+" + fmtCountdown(Math.abs(remaining)));
     bar.innerHTML = `
         <div class="sb-label">
             <svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg>
-            <span>${isMySession(sess) ? "Kamu sedang menggunakan" : `${esc(who)} sedang menggunakan`} &middot; Sisa waktu</span>
+            <span>${isMySession(sess) ? "Kamu sedang menggunakan" : `${esc(who)} sedang menggunakan`} &middot; Estimasi waktu</span>
         </div>
-        <span class="sb-timer${remaining < 120000 ? " urgent" : ""}">${fmtCountdown(remaining)}</span>`;
+        <span class="sb-timer${remaining < 120000 ? " urgent" : ""}">${timerDisplay}</span>`;
     startSessionTimer(sess);
 }
 
@@ -574,7 +589,7 @@ function renderQueue() {
     if (QS.session && isSessionActive(QS.session)) {
         const startMs = new Date(QS.session.session_start).getTime();
         const remMs = CONFIG.SESSION_MINUTES * 60000 - (Date.now() - startMs);
-        currentSessionRemainingMin = Math.max(1, Math.ceil(remMs / 60000));
+        currentSessionRemainingMin = Math.max(0, Math.ceil(remMs / 60000));
     }
 
     queue.forEach((q, idx) => {
