@@ -559,6 +559,12 @@ p {
     border-color: #11181f;
 }
 
+.hero .btn.primary:not([disabled]):hover {
+    background: #000000;
+    color: #ffffff;
+    border-color: #000000;
+}
+
 .hero .btn.session-end {
     background: #d32f2f;
     border-color: #d32f2f;
@@ -721,6 +727,7 @@ p {
 
     .btn.primary:not([disabled]):hover {
         background: var(--ink);
+        color: var(--bg);
         box-shadow: 0 8px 20px rgba(17, 24, 31, .28);
         transform: translateY(-1px)
     }
@@ -837,15 +844,17 @@ p {
     cursor: default;
 }
 
-.room.dlg-room.selected {
-    background: var(--ink);
-    border-color: var(--ink);
-    color: var(--bg);
-    box-shadow: 0 4px 12px rgba(17, 24, 31, .25);
+.room.dlg-room.selected,
+.room.dlg-room.selected:hover {
+    background: var(--field) !important;
+    border-color: var(--field) !important;
+    color: var(--on-field) !important;
+    box-shadow: 0 4px 14px rgba(255, 122, 61, .35);
 }
 
-.room.dlg-room.selected small {
-    color: var(--field);
+.room.dlg-room.selected small,
+.room.dlg-room.selected:hover small {
+    color: var(--on-field-2) !important;
 }
 
 @media (hover:hover) {
