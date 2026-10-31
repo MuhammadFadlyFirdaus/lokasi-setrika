@@ -210,7 +210,23 @@ const Store = {
     async load(id) {
         if (CLOUD) {
             const statusRows = await supaRest.get("lorong_status", `lorong_id=eq.${encodeURIComponent(id)}&select=*`);
-            const status = statusRows[0] || null;
+            let status = statusRows[0] || null;
+
+            // Auto-heal: Jika lorong_status kosong (karena database baru di-reset),
+            // buat baris default agar foreign key ke tabel sesi dan antrean tidak error.
+            if (!status) {
+                try {
+                    const now = new Date().toISOString();
+                    const initRows = await supaRest.upsert("lorong_status", {
+                        lorong_id: id,
+                        loc: "storage",
+                        name: "",
+                        updated_at: now
+                    });
+                    status = initRows[0] || { loc: "storage", name: "", updated_at: now };
+                } catch(e) { }
+            }
+
             const histRows = await supaRest.get("location_history",
                 `lorong_id=eq.${encodeURIComponent(id)}&order=created_at.desc&limit=${CONFIG.HISTORY_MAX}`);
             const history = histRows.map(h => ({ loc: h.loc, name: h.name || "", at: new Date(h.created_at).getTime() }));
@@ -260,6 +276,16 @@ const SessionStore = {
         return s;
     },
     async start(lorongId, userName) {
+        // Pastikan lorong_status sudah ada di database sebelum insert iron_session
+        try {
+            await supaRest.upsert("lorong_status", {
+                lorong_id: lorongId,
+                loc: "storage",
+                name: "",
+                updated_at: new Date().toISOString()
+            });
+        } catch(e) { }
+
         const now = new Date().toISOString();
         const rows = await supaRest.upsert("iron_session", {
             lorong_id: lorongId, session_id: CLIENT_SESSION_ID,
@@ -1070,14 +1096,27 @@ async function handleExtendSession(addMinutes = 5) {
 
 function openEndSessionDialog() {
     const nextQ = QS.queue.find(q => q.status === "waiting");
+    const esTitle = $("#esTitle");
     const esDesc = $("#esDesc");
-    if (esDesc) {
-        if (nextQ) {
+    const btnConfirm = $("#btnEndConfirm");
+
+    if (nextQ) {
+        if (esTitle) esTitle.textContent = "Selesai Menggunakan Setrika?";
+        if (esDesc) {
             esDesc.textContent = `Setrika akan dioper ke antrean berikutnya (${nextQ.user_name || "Antrean #1"}). Notifikasi akan langsung dikirimkan ke mereka.`;
-        } else {
-            esDesc.textContent = "Belum ada antrian berikutnya. Setrika akan berstatus bebas digunakan.";
         }
+        if (btnConfirm) btnConfirm.textContent = "Ya, Selesai & Beritahu Antrean";
+    } else {
+        // Ambil label kamar tempat setrika saat ini berada
+        const L = curL();
+        const currentRoomLabel = S && S.loc ? locText(S.loc, L) : "kamar";
+        if (esTitle) esTitle.textContent = "Selesai Menggunakan?";
+        if (esDesc) {
+            esDesc.textContent = `Tidak ada antrean berikutnya. Setrika akan tetap tersimpan di ${currentRoomLabel} dan berstatus bebas digunakan.`;
+        }
+        if (btnConfirm) btnConfirm.textContent = "Selesai & Simpan di Kamar";
     }
+
     showPane("endSession");
     openDialog();
 }
@@ -1090,7 +1129,7 @@ async function finishEndSession() {
         await SessionStore.end(cur, "user");
         closeDialog();
 
-        // Cek antrean berikutnya dan kirim notifikasi
+        // Cek antrean berikutnya dan kirim notifikasi jika ada antrean
         const queue = await QueueStore.load(cur);
         const frontW = queue.find(q => q.status === "waiting"), frontR = queue.find(q => q.status === "ready");
         if (!frontR && frontW) {
@@ -1099,10 +1138,13 @@ async function finishEndSession() {
                 toast("Giliran kamu tiba! Tekan konfirmasi untuk mulai.", true);
                 notifyTurn("✨ Giliran Kamu Tiba!", "Setrika siap digunakan. Segera konfirmasi dalam 2 menit!");
             }
+            await refreshAll(true);
+            toast("Sesi selesai. Notifikasi telah dikirim ke antrean berikutnya!", true);
+        } else {
+            await refreshAll(true);
+            toast("Sesi selesai. Setrika tersimpan di kamar & bebas digunakan.", true);
         }
 
-        await refreshAll(true);
-        toast("Sesi selesai. Notifikasi telah dikirim ke antrean berikutnya!", true);
         stopTimers();
     } catch (e) {
         toast("Gagal mengakhiri sesi. Coba lagi.");
