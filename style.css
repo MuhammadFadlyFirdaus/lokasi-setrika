@@ -1482,7 +1482,16 @@ input::placeholder {
 .qi-status {
     font-size: .8125rem;
     color: var(--muted);
-    margin-top: 1px
+    margin-top: 1px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+}
+
+.qi-estimate {
+    color: var(--link);
+    font-weight: 600;
 }
 
 .queue-item.ready .qi-status {

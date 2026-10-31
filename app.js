@@ -22,7 +22,49 @@ const CONFIG = {
     ]
 };
 
-/* ===== Utilitas ===== */
+/* ===== Suara & Notifikasi Giliran ===== */
+function playTurnSound() {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+        
+        // Pola melodi 3 nada ceria: C5 -> E5 -> G5
+        const notes = [523.25, 659.25, 783.99];
+        notes.forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(freq, now + idx * 0.16);
+            gain.gain.setValueAtTime(0, now + idx * 0.16);
+            gain.gain.linearRampToValueAtTime(0.25, now + idx * 0.16 + 0.03);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.16 + 0.28);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + idx * 0.16);
+            osc.stop(now + idx * 0.16 + 0.3);
+        });
+    } catch (e) { }
+}
+
+function notifyTurn(title, body) {
+    playTurnSound();
+    if ("Notification" in window && Notification.permission === "granted") {
+        try {
+            new Notification(title, {
+                body,
+                icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="%23ff7a3d" d="M2 20v-1.6L5.4 10.5h9.1c2.9 0 5.4 1.8 6.5 4.5l1.4 3.4c.4 1-.3 1.6-1.2 1.6zM9.3 14.5a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 1 0 0-2.2z"/></svg>'
+            });
+        } catch (e) { }
+    }
+}
+
+function requestNotificationPermission() {
+    if ("Notification" in window && Notification.permission === "default") {
+        try { Notification.requestPermission(); } catch (e) { }
+    }
+}
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
@@ -226,8 +268,22 @@ const SessionStore = {
 const QueueStore = {
     async load(lorongId) {
         if (!CLOUD) return [];
-        return supaRest.get("iron_queue",
+        // Muat antrian aktif, otomatis bersihkan / lewati entri kadaluarsa > 24 jam (Fitur 5)
+        const rows = await supaRest.get("iron_queue",
             `lorong_id=eq.${encodeURIComponent(lorongId)}&status=in.(waiting,ready)&order=queue_number.asc&select=*`);
+        
+        const now = Date.now();
+        const valid = [];
+        for (const q of rows) {
+            const age = now - new Date(q.joined_at).getTime();
+            // Jika antrean sudah lebih dari 24 jam menggantung, tandai done di background
+            if (age > 24 * 3600000) {
+                supaRest.patch("iron_queue", { id: q.id }, { status: "done" }).catch(() => {});
+            } else {
+                valid.push(q);
+            }
+        }
+        return valid;
     },
     async nextNumber(lorongId) {
         const rows = await supaRest.get("iron_queue",
@@ -501,8 +557,8 @@ function renderHeroButtons() {
     $("#btnJoinQueue").hidden = !((activeByOther || (hasQueue && !activeByMe)) && !myEntry);
     // Batalkan Antrian: saya di antrian waiting
     $("#btnCancelQueue").hidden = !(myEntry && myEntry.status === "waiting");
-    // Konfirmasi Giliran: saya ready
-    $("#btnConfirmTurn").hidden = !iAmReady;
+    // Konfirmasi Giliran: saya ready DAN tidak ada sesi aktif lain
+    $("#btnConfirmTurn").hidden = !(iAmReady && !active);
 }
 
 function renderQueue() {
@@ -512,6 +568,15 @@ function renderQueue() {
 
     const count = queue.length;
     let html = `<p class="queue-count">${count} orang dalam antrian</p><ul class="queue-list">`;
+    
+    // Hitung sisa waktu sesi aktif untuk estimasi tunggu antrean
+    let currentSessionRemainingMin = 0;
+    if (QS.session && isSessionActive(QS.session)) {
+        const startMs = new Date(QS.session.session_start).getTime();
+        const remMs = CONFIG.SESSION_MINUTES * 60000 - (Date.now() - startMs);
+        currentSessionRemainingMin = Math.max(1, Math.ceil(remMs / 60000));
+    }
+
     queue.forEach((q, idx) => {
         const isMine = q.session_id === CLIENT_SESSION_ID;
         const isReady = q.status === "ready";
@@ -522,6 +587,18 @@ function renderQueue() {
                 countdownHtml = `<p class="qi-countdown${remaining < 30000 ? " urgent" : ""}">Konfirmasi dalam: ${fmtCountdown(remaining)}</p>`;
             }
         }
+
+        // Estimasi waktu tunggu (Fitur 3)
+        let waitEstimate = "";
+        if (isReady) {
+            waitEstimate = "";
+        } else if (idx === 0) {
+            waitEstimate = currentSessionRemainingMin > 0 ? `~${currentSessionRemainingMin} mnt lagi` : "segera";
+        } else {
+            const totalEst = currentSessionRemainingMin + (idx * CONFIG.SESSION_MINUTES);
+            waitEstimate = `~${totalEst} mnt lagi`;
+        }
+
         const statusLabel = isReady ? (isMine ? "✨ Giliran kamu!" : "Giliran Berikutnya")
             : (idx === 0 ? "Menunggu giliran berikutnya" : "Menunggu");
         const cancelBtn = (isMine && q.status === "waiting")
@@ -533,7 +610,10 @@ function renderQueue() {
             <div class="qi-num">${idx + 1}</div>
             <div class="qi-info">
                 <div class="qi-name">${esc(q.user_name || "Tanpa nama")}</div>
-                <div class="qi-status">${esc(statusLabel)}</div>
+                <div class="qi-status">
+                    <span>${esc(statusLabel)}</span>
+                    ${waitEstimate ? `<span class="qi-estimate">&bull; Estimasi: ${esc(waitEstimate)}</span>` : ""}
+                </div>
                 ${countdownHtml}
             </div>
             ${cancelBtn}
@@ -603,7 +683,10 @@ async function refreshQueue() {
                 if (!latestReady && latestWaiting && latestWaiting.id === frontWaiting.id) {
                     await QueueStore.markReady(frontWaiting.id);
                     QS.queue = await QueueStore.load(cur);
-                    if (frontWaiting.session_id === CLIENT_SESSION_ID) toast("Giliran kamu tiba! Tekan konfirmasi untuk mulai.", true);
+                    if (frontWaiting.session_id === CLIENT_SESSION_ID) {
+                        toast("Giliran kamu tiba! Tekan konfirmasi untuk mulai.", true);
+                        notifyTurn("✨ Giliran Kamu Tiba!", "Setrika siap digunakan. Segera konfirmasi dalam 2 menit!");
+                    }
                 } else {
                     QS.queue = latestQueue;
                 }
@@ -623,7 +706,10 @@ async function refreshQueue() {
                         if (!nextReady) {
                             await QueueStore.markReady(nextW.id);
                             QS.queue = await QueueStore.load(cur);
-                            if (nextW.session_id === CLIENT_SESSION_ID) toast("Giliran kamu tiba! Tekan konfirmasi untuk mulai.", true);
+                            if (nextW.session_id === CLIENT_SESSION_ID) {
+                                toast("Giliran kamu tiba! Tekan konfirmasi untuk mulai.", true);
+                                notifyTurn("✨ Giliran Kamu Tiba!", "Setrika siap digunakan. Segera konfirmasi dalam 2 menit!");
+                            }
                         } else {
                             QS.queue = nextCheck;
                         }
@@ -673,9 +759,20 @@ function closeDialog() {
     setTimeout(() => { if (dlg.classList.contains("closing")) finish(); }, 360);
 }
 function showPane(name) {
-    $("#panePick").hidden = name !== "pick"; $("#paneConfirm").hidden = name !== "confirm";
-    const title = name === "pick" ? $("#pkTitle") : $("#cfTitle");
-    dlg.setAttribute("aria-labelledby", title.id); title.focus();
+    $("#panePick").hidden = name !== "pick";
+    $("#paneConfirm").hidden = name !== "confirm";
+    const pStart = $("#paneStartSession");
+    if (pStart) pStart.hidden = name !== "startSession";
+    const pEnd = $("#paneEndSession");
+    if (pEnd) pEnd.hidden = name !== "endSession";
+
+    const title = name === "pick" ? $("#pkTitle") :
+        (name === "confirm" ? $("#cfTitle") :
+        (name === "startSession" ? $("#ssTitle") : $("#esTitle")));
+    if (title) {
+        dlg.setAttribute("aria-labelledby", title.id);
+        title.focus();
+    }
 }
 function renderOpts() {
     const L = curL(), q = $("#q").value.trim().toLowerCase();
@@ -760,46 +857,168 @@ async function submitConfirm() {
 }
 
 /* ===== Aksi Sesi ===== */
-async function handleStartSession() {
-    const btn = $("#btnStartSession");
-    // Guard: cegah start jika masih ada antrian aktif
+function openStartSessionDialog() {
+    if (CLOUD && isSessionActive(QS.session)) {
+        toast("Setrika sedang digunakan oleh orang lain.");
+        return;
+    }
     if (QS.queue.length > 0) {
         toast("Masih ada antrian. Silakan bergabung ke antrian.");
         return;
     }
-    btn.disabled = true; btn.textContent = "Memulai...";
-    try {
-        await SessionStore.start(cur, (profile.get().name || "").trim());
-        await refreshAll(true);
-        toast("Sesi dimulai. Selesai dalam " + CONFIG.SESSION_MINUTES + " menit.", true);
-    } catch (e) { toast("Gagal memulai sesi. Coba lagi."); }
-    finally { btn.disabled = false; btn.textContent = "Mulai Menggunakan"; }
+
+    const sel = $("#ssRoom");
+    if (sel && curL()) {
+        const rooms = roomsOf(curL());
+        const savedRoom = profile.get().room || "";
+        sel.innerHTML = '<option value="">-- Pilih Kamar (270 - 280) --</option>' +
+            rooms.map(r => `<option value="${esc(r.id)}"${r.id === savedRoom ? " selected" : ""}>Kamar ${esc(r.label)}</option>`).join("");
+    }
+    const nameIn = $("#ssName");
+    if (nameIn) nameIn.value = profile.get().name || "";
+    const errEl = $("#ssErr");
+    if (errEl) errEl.textContent = "";
+
+    showPane("startSession");
+    openDialog();
+    if (sel) sel.focus();
 }
-async function handleEndSession() {
-    const btn = $("#btnEndSession");
-    btn.disabled = true; btn.textContent = "Mengakhiri...";
+
+async function submitStartSession() {
+    const sel = $("#ssRoom"), nameIn = $("#ssName"), errEl = $("#ssErr"), btn = $("#ssOk");
+    const roomId = (sel ? sel.value : "").trim();
+    const name = (nameIn ? nameIn.value : "").replace(/\s+/g, " ").trim();
+
+    if (!roomId) {
+        if (errEl) errEl.textContent = "Silakan pilih kamar kamu terlebih dahulu.";
+        if (sel) sel.focus();
+        return;
+    }
+
+    if (CLOUD) {
+        const checkSess = await SessionStore.load(cur);
+        if (isSessionActive(checkSess)) {
+            if (errEl) errEl.textContent = "Setrika baru saja digunakan oleh orang lain.";
+            toast("Setrika sedang digunakan oleh orang lain.");
+            await refreshAll(true);
+            return;
+        }
+    }
+    if (QS.queue.length > 0) {
+        if (errEl) errEl.textContent = "Ada antrian masuk. Silakan ambil antrian.";
+        toast("Masih ada antrian. Silakan bergabung ke antrian.");
+        await refreshAll(true);
+        return;
+    }
+
+    const L = curL();
+    const rObj = roomsOf(L).find(r => r.id === roomId);
+    const roomLabel = rObj ? rObj.label : roomId;
+    const labelRoom = `Kamar ${roomLabel}`;
+    const displayIdentity = name ? `${labelRoom} (${name})` : labelRoom;
+
+    btn.disabled = true; btn.textContent = "Memulai...";
+    if (errEl) errEl.textContent = "";
+
+    try {
+        await SessionStore.start(cur, displayIdentity);
+        profile.set({ ...profile.get(), room: roomId, name });
+
+        // Otomatis pindahkan lokasi setrika ke kamar pengguna
+        const newLoc = "room:" + roomId;
+        const now = Date.now();
+        const fresh = await Store.load(cur);
+        const next = {
+            loc: newLoc,
+            name: displayIdentity,
+            at: now,
+            history: [{ loc: newLoc, name: displayIdentity, at: now }, ...(fresh.history || [])].slice(0, CONFIG.HISTORY_MAX)
+        };
+        await Store.save(cur, next);
+        S = await Store.load(cur);
+
+        closeDialog();
+        await refreshAll(true);
+        toast(`Sesi dimulai. Setrika otomatis berpindah ke Kamar ${roomLabel}!`, true);
+    } catch (e) {
+        if (errEl) errEl.textContent = "Gagal memulai sesi. Coba lagi.";
+        toast("Gagal memulai sesi. Coba lagi.");
+    } finally {
+        btn.disabled = false; btn.textContent = "Mulai Pakai";
+    }
+}
+function openEndSessionDialog() {
+    showPane("endSession");
+    openDialog();
+}
+
+async function finishEndSession(action) {
+    const btnStorage = $("#btnEndReturnStorage"), btnKeep = $("#btnEndKeepRoom");
+    btnStorage.disabled = true; btnKeep.disabled = true;
+
     try {
         await SessionStore.end(cur, "user");
+        
+        // Jika pengguna memilih kembalikan ke tempat penyimpanan
+        if (action === "storage") {
+            const L = curL();
+            const now = Date.now();
+            const fresh = await Store.load(cur);
+            const myName = profile.get().name || "";
+            const next = {
+                loc: "storage",
+                name: myName ? `${myName} (Disimpan kembali)` : "Disimpan kembali",
+                at: now,
+                history: [{ loc: "storage", name: myName || "Disimpan kembali", at: now }, ...(fresh.history || [])].slice(0, CONFIG.HISTORY_MAX)
+            };
+            await Store.save(cur, next);
+            S = await Store.load(cur);
+        }
+
+        closeDialog();
+
+        // Cek antrean berikutnya
         const queue = await QueueStore.load(cur);
         const frontW = queue.find(q => q.status === "waiting"), frontR = queue.find(q => q.status === "ready");
         if (!frontR && frontW) {
             await QueueStore.markReady(frontW.id);
-            if (frontW.session_id === CLIENT_SESSION_ID) toast("Giliran kamu tiba! Tekan konfirmasi untuk mulai.", true);
+            if (frontW.session_id === CLIENT_SESSION_ID) {
+                toast("Giliran kamu tiba! Tekan konfirmasi untuk mulai.", true);
+                notifyTurn("✨ Giliran Kamu Tiba!", "Setrika siap digunakan. Segera konfirmasi dalam 2 menit!");
+            }
         }
+
         await refreshAll(true);
-        toast("Sesi selesai. Setrika bebas digunakan lagi.", true);
+        toast(action === "storage" ? "Sesi selesai & setrika dikembalikan ke tempat penyimpanan." : "Sesi selesai. Setrika bebas digunakan lagi.", true);
         stopTimers();
-    } catch (e) { toast("Gagal mengakhiri sesi. Coba lagi."); }
-    finally { btn.disabled = false; btn.textContent = "Selesai Menggunakan"; }
+    } catch (e) {
+        toast("Gagal mengakhiri sesi. Coba lagi.");
+    } finally {
+        btnStorage.disabled = false; btnKeep.disabled = false;
+    }
 }
 async function handleConfirmTurn() {
     const btn = $("#btnConfirmTurn"), myEntry = myQueueEntry();
     if (!myEntry) return;
+
+    // Pastikan tidak ada sesi aktif lain sebelum memulai
+    if (CLOUD) {
+        const checkSess = await SessionStore.load(cur);
+        if (isSessionActive(checkSess)) {
+            toast("Setrika masih digunakan oleh orang lain. Tunggu hingga selesai.");
+            await refreshAll(true);
+            return;
+        }
+    }
+
     btn.disabled = true; btn.textContent = "Memulai...";
     try {
-        await QueueStore.markDone(myEntry.id);
         const userName = myEntry.user_name || (profile.get().name || "").trim();
+        // 1. Mulai sesi terlebih dahulu agar setrika langsung berstatus aktif
         await SessionStore.start(cur, userName);
+
+        // 2. Tandai antrean selesai
+        await QueueStore.markDone(myEntry.id);
 
         // Jika antrean mencantumkan kamar (misal profile.room atau dari user_name "Kamar 270..."),
         // pindahkan lokasi setrika secara otomatis ke kamar tersebut.
@@ -901,10 +1120,17 @@ function toast(t, ok) {
 
 /* ===== Event ===== */
 $("#btnUpdate").addEventListener("click", openPick);
-$("#btnStartSession").addEventListener("click", handleStartSession);
-$("#btnEndSession").addEventListener("click", handleEndSession);
+$("#btnStartSession").addEventListener("click", openStartSessionDialog);
+$("#ssCancel").addEventListener("click", closeDialog);
+$("#ssOk").addEventListener("click", submitStartSession);
+$("#ssName").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); submitStartSession(); } });
+$("#btnEndSession").addEventListener("click", openEndSessionDialog);
+$("#btnEndReturnStorage").addEventListener("click", () => finishEndSession("storage"));
+$("#btnEndKeepRoom").addEventListener("click", () => finishEndSession("keep"));
+$("#btnEndCancel").addEventListener("click", closeDialog);
 $("#btnConfirmTurn").addEventListener("click", handleConfirmTurn);
 $("#btnJoinQueue").addEventListener("click", () => {
+    requestNotificationPermission();
     const form = $("#queueJoinForm");
     form.hidden = !form.hidden;
     if (!form.hidden) {

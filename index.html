@@ -157,6 +157,34 @@
             </div>
             <button type="button" class="link" id="cfBack">Pilih lokasi lain</button>
         </section>
+        <section class="pane" id="paneStartSession" hidden>
+            <h2 id="ssTitle" tabindex="-1">Mulai Menggunakan Setrika</h2>
+            <div class="field">
+                <label class="lbl" for="ssRoom">Kamar kamu</label>
+                <select id="ssRoom" class="sel-input" required>
+                    <option value="">-- Pilih Kamar (270 - 280) --</option>
+                </select>
+            </div>
+            <div class="field" style="margin-top:12px">
+                <label class="lbl" for="ssName">Nama (opsional)</label>
+                <input id="ssName" type="text" maxlength="30" autocomplete="name" placeholder="Contoh: Rani">
+                <p class="note">Tampil agar teman lorong tahu siapa yang sedang memakai.</p>
+            </div>
+            <p class="err" id="ssErr" role="alert"></p>
+            <div class="actions">
+                <button type="button" class="btn" id="ssCancel">Batalkan</button>
+                <button type="button" class="btn primary" id="ssOk">Mulai Pakai</button>
+            </div>
+        </section>
+        <section class="pane" id="paneEndSession" hidden>
+            <h2 id="esTitle" tabindex="-1">Selesai Menggunakan Setrika</h2>
+            <p class="hint" style="margin-bottom:16px">Setrika akan disimpan di mana setelah selesai?</p>
+            <div class="actions" style="flex-direction:column; gap:10px">
+                <button type="button" class="btn primary block" id="btnEndReturnStorage">Kembalikan ke Tempat Penyimpanan</button>
+                <button type="button" class="btn block" id="btnEndKeepRoom">Tetap di Kamar / Oper ke Antrean</button>
+                <button type="button" class="link" id="btnEndCancel">Batal</button>
+            </div>
+        </section>
     </dialog>
 
     <div class="toast" id="toast" role="status"><svg class="ic" aria-hidden="true" hidden>
