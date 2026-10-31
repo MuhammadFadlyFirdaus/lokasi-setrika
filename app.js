@@ -962,7 +962,7 @@ function renderDlgFloor() {
             ${selected ? `<small><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Dipilih</small>` : ""}
         </button>`;
     };
-    const cell = item => item === null ? '<div class="room spacer" aria-hidden="true"></div>' : btn(item);
+    const cell = item => item === null ? '<div class="room dlg-room spacer" aria-hidden="true"></div>' : btn(item);
     const colL = $("#dlgColL"), colR = $("#dlgColR");
     if (colL) colL.innerHTML = L.left.map(cell).join("");
     if (colR) colR.innerHTML = L.right.map(cell).join("");
@@ -1069,36 +1069,28 @@ async function handleExtendSession(addMinutes = 5) {
 }
 
 function openEndSessionDialog() {
+    const nextQ = QS.queue.find(q => q.status === "waiting");
+    const esDesc = $("#esDesc");
+    if (esDesc) {
+        if (nextQ) {
+            esDesc.textContent = `Setrika akan dioper ke antrean berikutnya (${nextQ.user_name || "Antrean #1"}). Notifikasi akan langsung dikirimkan ke mereka.`;
+        } else {
+            esDesc.textContent = "Belum ada antrian berikutnya. Setrika akan berstatus bebas digunakan.";
+        }
+    }
     showPane("endSession");
     openDialog();
 }
 
-async function finishEndSession(action) {
-    const btnStorage = $("#btnEndReturnStorage"), btnKeep = $("#btnEndKeepRoom");
-    btnStorage.disabled = true; btnKeep.disabled = true;
+async function finishEndSession() {
+    const btn = $("#btnEndConfirm");
+    if (btn) btn.disabled = true;
 
     try {
         await SessionStore.end(cur, "user");
-        
-        // Jika pengguna memilih kembalikan ke tempat penyimpanan
-        if (action === "storage") {
-            const L = curL();
-            const now = Date.now();
-            const fresh = await Store.load(cur);
-            const myName = profile.get().name || "";
-            const next = {
-                loc: "storage",
-                name: myName ? `${myName} (Disimpan kembali)` : "Disimpan kembali",
-                at: now,
-                history: [{ loc: "storage", name: myName || "Disimpan kembali", at: now }, ...(fresh.history || [])].slice(0, CONFIG.HISTORY_MAX)
-            };
-            await Store.save(cur, next);
-            S = await Store.load(cur);
-        }
-
         closeDialog();
 
-        // Cek antrean berikutnya
+        // Cek antrean berikutnya dan kirim notifikasi
         const queue = await QueueStore.load(cur);
         const frontW = queue.find(q => q.status === "waiting"), frontR = queue.find(q => q.status === "ready");
         if (!frontR && frontW) {
@@ -1110,12 +1102,12 @@ async function finishEndSession(action) {
         }
 
         await refreshAll(true);
-        toast(action === "storage" ? "Sesi selesai & setrika dikembalikan ke tempat penyimpanan." : "Sesi selesai. Setrika bebas digunakan lagi.", true);
+        toast("Sesi selesai. Notifikasi telah dikirim ke antrean berikutnya!", true);
         stopTimers();
     } catch (e) {
         toast("Gagal mengakhiri sesi. Coba lagi.");
     } finally {
-        btnStorage.disabled = false; btnKeep.disabled = false;
+        if (btn) btn.disabled = false;
     }
 }
 async function handleConfirmTurn() {
@@ -1186,7 +1178,7 @@ function renderDlgQueueFloor() {
             ${selected ? `<small><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Dipilih</small>` : ""}
         </button>`;
     };
-    const cell = item => item === null ? '<div class="room spacer" aria-hidden="true"></div>' : btn(item);
+    const cell = item => item === null ? '<div class="room dlg-room spacer" aria-hidden="true"></div>' : btn(item);
     const colL = $("#dlgQueueColL"), colR = $("#dlgQueueColR");
     if (colL) colL.innerHTML = L.left.map(cell).join("");
     if (colR) colR.innerHTML = L.right.map(cell).join("");
@@ -1290,8 +1282,7 @@ if (dlgFloor) {
     });
 }
 $("#btnEndSession").addEventListener("click", openEndSessionDialog);
-$("#btnEndReturnStorage").addEventListener("click", () => finishEndSession("storage"));
-$("#btnEndKeepRoom").addEventListener("click", () => finishEndSession("keep"));
+$("#btnEndConfirm").addEventListener("click", finishEndSession);
 $("#btnEndCancel").addEventListener("click", closeDialog);
 $("#btnExtendAdd5").addEventListener("click", () => handleExtendSession(5));
 $("#btnExtendDone").addEventListener("click", () => {

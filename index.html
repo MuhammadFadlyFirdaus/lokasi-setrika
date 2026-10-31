@@ -27,14 +27,16 @@
                 stroke-linecap="round" stroke-linejoin="round" />
         </symbol>
         <symbol id="i-clock" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>
-            <path d="M12 7v5l3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+            <path d="M12 7v5l3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round" />
         </symbol>
         <symbol id="i-x" viewBox="0 0 20 20">
-            <path d="M5 5l10 10M15 5l-10 10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+            <path d="M5 5l10 10M15 5l-10 10" fill="none" stroke="currentColor" stroke-width="2.2"
+                stroke-linecap="round" />
         </symbol>
         <symbol id="i-play" viewBox="0 0 20 20">
-            <path d="M6 4l12 8-12 8V4z" fill="currentColor"/>
+            <path d="M6 4l12 8-12 8V4z" fill="currentColor" />
         </symbol>
     </svg>
     <noscript>
@@ -72,11 +74,14 @@
                 </div>
 
                 <div class="hero-actions" id="heroActions">
-                    <button type="button" class="btn primary block" id="btnStartSession" hidden>Mulai Menggunakan</button>
-                    <button type="button" class="btn block session-end" id="btnEndSession" hidden>Selesai Menggunakan</button>
+                    <button type="button" class="btn primary block" id="btnStartSession" hidden>Mulai
+                        Menggunakan</button>
+                    <button type="button" class="btn block session-end" id="btnEndSession" hidden>Selesai
+                        Menggunakan</button>
                     <button type="button" class="btn primary block" id="btnJoinQueue" hidden>Ambil Antrian</button>
                     <button type="button" class="btn block" id="btnCancelQueue" hidden>Batalkan Antrianku</button>
-                    <button type="button" class="btn primary block" id="btnConfirmTurn" hidden>Mulai Menggunakan (Giliran Saya)</button>
+                    <button type="button" class="btn primary block" id="btnConfirmTurn" hidden>Mulai Menggunakan
+                        (Giliran Saya)</button>
                 </div>
                 <p class="note">Lokasi berpindah otomatis saat penghuni mulai dan selesai menggunakan setrika.</p>
             </section>
@@ -111,9 +116,10 @@
                     <li><strong>Notifikasi Waktu Habis & Tambah Waktu:</strong> Setelah 15 menit, akan muncul notifikasi suara dan dialog peringatan. Anda diberi waktu tenggang (delay) 1 menit untuk menekan <em>+ Tambah Waktu 5 Menit</em> jika masih perlu, atau sesi akan otomatis diselesaikan sistem.</li>
                     <li><strong>Ambil Antrian (Jika Sedang Dipakai):</strong> Tekan <em>Ambil Antrian</em> dan pilih nomor kamarmu. Cek nomor urut serta perkiraan waktu tunggu pada daftar antrean.</li>
                     <li><strong>Giliran Tiba (2 Menit):</strong> Saat giliranmu tiba, bunyi notifikasi akan berdering. Segera tekan <em>Mulai Menggunakan (Giliran Saya)</em> dalam batas waktu 2 menit agar giliran tidak terlewat.</li>
-                    <li><strong>Selesai Dipakai:</strong> Setelah selesai menyetrika, tekan <em>Selesai Menggunakan</em>, lalu pilih apakah setrika dikembalikan ke <em>Tempat penyimpanan</em> atau dioper ke kamar antrean berikutnya.</li>
+                    <li><strong>Selesai Dipakai:</strong> Setelah selesai menyetrika, tekan <em>Selesai Menggunakan</em>. Sistem akan otomatis memberitahu antrean berikutnya bahwa setrika siap diambil/dioper.</li>
                 </ol>
-                <p>Karena digunakan bersama, harap segera menekan "Selesai Menggunakan" setelah selesai menyetrika agar giliran berikutnya dapat segera memakai.</p>
+                <p>Karena digunakan bersama, harap segera menekan "Selesai Menggunakan" setelah selesai menyetrika agar
+                    giliran berikutnya dapat segera memakai.</p>
             </details>
         </main>
     </div>
@@ -185,18 +191,19 @@
         </section>
         <section class="pane" id="paneExtendSession" hidden>
             <h2 id="extTitle" tabindex="-1">Waktu 15 Menit Telah Habis!</h2>
-            <p class="hint" id="extDesc" style="margin-bottom:16px">Sesi akan otomatis diselesaikan dalam <strong id="extCountdown" style="color:var(--err)">60 detik</strong>. Masih butuh waktu untuk menyetrika?</p>
+            <p class="hint" id="extDesc" style="margin-bottom:16px">Sesi akan otomatis diselesaikan dalam <strong
+                    id="extCountdown" style="color:var(--err)">60 detik</strong>. Masih butuh waktu untuk menyetrika?
+            </p>
             <div class="actions" style="flex-direction:column; gap:10px">
                 <button type="button" class="btn primary block" id="btnExtendAdd5">+ Tambah Waktu 5 Menit</button>
                 <button type="button" class="btn block" id="btnExtendDone">Sudah Selesai Menggunakan</button>
             </div>
         </section>
         <section class="pane" id="paneEndSession" hidden>
-            <h2 id="esTitle" tabindex="-1">Selesai Menggunakan Setrika</h2>
-            <p class="hint" style="margin-bottom:16px">Setrika akan disimpan di mana setelah selesai?</p>
+            <h2 id="esTitle" tabindex="-1">Selesai Menggunakan Setrika?</h2>
+            <p class="hint" id="esDesc" style="margin-bottom:16px">Sesi akan diakhiri dan antrean berikutnya akan segera diberitahu.</p>
             <div class="actions" style="flex-direction:column; gap:10px">
-                <button type="button" class="btn primary block" id="btnEndReturnStorage">Kembalikan ke Tempat Penyimpanan</button>
-                <button type="button" class="btn block" id="btnEndKeepRoom">Tetap di Kamar / Oper ke Antrean</button>
+                <button type="button" class="btn primary block" id="btnEndConfirm">Ya, Selesai & Beritahu Antrean</button>
                 <button type="button" class="link" id="btnEndCancel">Batal</button>
             </div>
         </section>

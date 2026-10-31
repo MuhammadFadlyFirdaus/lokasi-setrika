@@ -825,10 +825,16 @@ p {
     background: var(--tone);
 }
 
-.room.dlg-room {
+.room.dlg-room,
+.room.dlg-room.spacer {
     cursor: pointer;
     min-height: 48px;
     padding: 6px 10px;
+    box-sizing: border-box;
+}
+
+.room.dlg-room.spacer {
+    cursor: default;
 }
 
 .room.dlg-room.selected {
