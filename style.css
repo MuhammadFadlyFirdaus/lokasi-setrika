@@ -816,14 +816,37 @@ p {
     animation: tilePop var(--d-slow) var(--ease) both
 }
 
-.room.pop::after {
-    content: "";
-    position: absolute;
-    inset: -3px;
-    border-radius: calc(var(--r) + 3px);
-    border: 2px solid var(--field);
-    pointer-events: none;
-    animation: tileRing 650ms var(--ease) both
+.dlg-floor {
+    max-height: 240px;
+    overflow-y: auto;
+    padding: 4px;
+    margin-top: 10px;
+    border-radius: var(--r);
+    background: var(--tone);
+}
+
+.room.dlg-room {
+    cursor: pointer;
+    min-height: 48px;
+    padding: 6px 10px;
+}
+
+.room.dlg-room.selected {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--bg);
+    box-shadow: 0 4px 12px rgba(17, 24, 31, .25);
+}
+
+.room.dlg-room.selected small {
+    color: var(--field);
+}
+
+@media (hover:hover) {
+    .room.dlg-room:not(.selected):hover {
+        background: var(--hover);
+        transform: translateY(-1px);
+    }
 }
 
 @media (hover:hover) {

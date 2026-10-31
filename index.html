@@ -159,17 +159,16 @@
             <button type="button" class="link" id="cfBack">Pilih lokasi lain</button>
         </section>
         <section class="pane" id="paneStartSession" hidden>
-            <h2 id="ssTitle" tabindex="-1">Mulai Menggunakan Setrika</h2>
-            <div class="field">
-                <label class="lbl" for="ssRoom">Kamar kamu</label>
-                <select id="ssRoom" class="sel-input" required>
-                    <option value="">-- Pilih Kamar (270 - 280) --</option>
-                </select>
+            <h2 id="ssTitle" tabindex="-1">Pilih Kamar Kamu</h2>
+            <p class="hint">Ketuk kamarmu pada denah lorong di bawah:</p>
+            <div class="floor dlg-floor" id="dlgFloor">
+                <div class="col" id="dlgColL"></div>
+                <div class="corridor" aria-hidden="true"><span>Lorong</span></div>
+                <div class="col" id="dlgColR"></div>
             </div>
-            <div class="field" style="margin-top:12px">
+            <div class="field" style="margin-top:14px">
                 <label class="lbl" for="ssName">Nama (opsional)</label>
                 <input id="ssName" type="text" maxlength="30" autocomplete="name" placeholder="Contoh: Rani">
-                <p class="note">Tampil agar teman lorong tahu siapa yang sedang memakai.</p>
             </div>
             <p class="err" id="ssErr" role="alert"></p>
             <div class="actions">

@@ -963,6 +963,23 @@ async function submitConfirm() {
 }
 
 /* ===== Aksi Sesi ===== */
+let selectedStartRoomId = null;
+
+function renderDlgFloor() {
+    const L = curL();
+    const btn = ([id, label]) => {
+        const selected = selectedStartRoomId === id;
+        return `<button type="button" class="room dlg-room${selected ? " selected" : ""}" data-dlg-room="${esc(id)}">
+            <span>${esc(label)}</span>
+            ${selected ? `<small><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Dipilih</small>` : ""}
+        </button>`;
+    };
+    const cell = item => item === null ? '<div class="room spacer" aria-hidden="true"></div>' : btn(item);
+    const colL = $("#dlgColL"), colR = $("#dlgColR");
+    if (colL) colL.innerHTML = L.left.map(cell).join("");
+    if (colR) colR.innerHTML = L.right.map(cell).join("");
+}
+
 function openStartSessionDialog() {
     if (CLOUD && isSessionActive(QS.session)) {
         toast("Setrika sedang digunakan oleh orang lain.");
@@ -973,13 +990,9 @@ function openStartSessionDialog() {
         return;
     }
 
-    const sel = $("#ssRoom");
-    if (sel && curL()) {
-        const rooms = roomsOf(curL());
-        const savedRoom = profile.get().room || "";
-        sel.innerHTML = '<option value="">-- Pilih Kamar (270 - 280) --</option>' +
-            rooms.map(r => `<option value="${esc(r.id)}"${r.id === savedRoom ? " selected" : ""}>Kamar ${esc(r.label)}</option>`).join("");
-    }
+    selectedStartRoomId = profile.get().room || null;
+    renderDlgFloor();
+
     const nameIn = $("#ssName");
     if (nameIn) nameIn.value = profile.get().name || "";
     const errEl = $("#ssErr");
@@ -987,17 +1000,15 @@ function openStartSessionDialog() {
 
     showPane("startSession");
     openDialog();
-    if (sel) sel.focus();
 }
 
 async function submitStartSession() {
-    const sel = $("#ssRoom"), nameIn = $("#ssName"), errEl = $("#ssErr"), btn = $("#ssOk");
-    const roomId = (sel ? sel.value : "").trim();
+    const nameIn = $("#ssName"), errEl = $("#ssErr"), btn = $("#ssOk");
+    const roomId = selectedStartRoomId;
     const name = (nameIn ? nameIn.value : "").replace(/\s+/g, " ").trim();
 
     if (!roomId) {
-        if (errEl) errEl.textContent = "Silakan pilih kamar kamu terlebih dahulu.";
-        if (sel) sel.focus();
+        if (errEl) errEl.textContent = "Silakan ketuk nomor kamarmu pada denah terlebih dahulu.";
         return;
     }
 
@@ -1247,6 +1258,17 @@ $("#btnStartSession").addEventListener("click", openStartSessionDialog);
 $("#ssCancel").addEventListener("click", closeDialog);
 $("#ssOk").addEventListener("click", submitStartSession);
 $("#ssName").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); submitStartSession(); } });
+const dlgFloor = $("#dlgFloor");
+if (dlgFloor) {
+    dlgFloor.addEventListener("click", e => {
+        const b = e.target.closest("[data-dlg-room]");
+        if (!b) return;
+        selectedStartRoomId = b.dataset.dlgRoom;
+        renderDlgFloor();
+        const errEl = $("#ssErr");
+        if (errEl) errEl.textContent = "";
+    });
+}
 $("#btnEndSession").addEventListener("click", openEndSessionDialog);
 $("#btnEndReturnStorage").addEventListener("click", () => finishEndSession("storage"));
 $("#btnEndKeepRoom").addEventListener("click", () => finishEndSession("keep"));
