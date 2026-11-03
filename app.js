@@ -547,8 +547,8 @@ function renderStatus() {
     } else {
         known = true; key = S.loc;
         const f = freshness(S.at), rel = relTime(S.at), when = absTime(S.at);
-        tone = f === "stale" ? "quiet" : "warm";
-        const line = f === "stale" ? `Terakhir diperbarui ${rel} (${when}). Lokasi mungkin sudah berubah.` : `Diperbarui ${rel} (${when})`;
+        tone = "warm";
+        const line = f === "stale" ? `Terakhir diperbarui ${rel} (${when})` : `Diperbarui ${rel} (${when})`;
         const p = parseLoc(S.loc);
         const sub = S.name ? `Dibawa ${esc(S.name)}` : (p && p.kind === "storage" ? "Bisa langsung diambil" : "");
         html = locHtml(S.loc, L) + (sub ? `<p class="sub">${sub}</p>` : "") +
