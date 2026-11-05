@@ -846,33 +846,32 @@ p {
 
 .room.dlg-room.selected,
 .room.dlg-room.selected:hover {
-    background: var(--field) !important;
-    border-color: var(--field) !important;
-    color: var(--on-field) !important;
-    box-shadow: 0 4px 14px rgba(255, 122, 61, .35);
+    background: #ffffff !important;
+    border-color: #ffffff !important;
+    color: #11181f !important;
+    box-shadow: none !important;
 }
 
 .room.dlg-room.selected small,
 .room.dlg-room.selected:hover small {
-    color: var(--on-field-2) !important;
+    color: #11181f !important;
+}
+
+.plan .floor {
+    pointer-events: none;
+    user-select: none;
 }
 
 @media (hover:hover) {
+    .plan .room:not(.here):hover {
+        background: var(--surface);
+        transform: none;
+        box-shadow: none;
+    }
+
     .room.dlg-room:not(.selected):hover {
         background: var(--hover);
         transform: translateY(-1px);
-    }
-}
-
-@media (hover:hover) {
-    .room:not(.here):hover {
-        background: var(--hover);
-        transform: translateY(-2px);
-        box-shadow: 0 6px 14px rgba(17, 24, 31, .12)
-    }
-
-    .room:not(.here):active {
-        transform: scale(.97)
     }
 }
 

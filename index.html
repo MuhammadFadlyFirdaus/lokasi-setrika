@@ -7,7 +7,7 @@
     <meta name="color-scheme" content="light dark">
     <meta name="theme-color" content="#eef0f2" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#0f1419" media="(prefers-color-scheme: dark)">
-    <title>SetrikaMap: lokasi setrika asrama</title>
+    <title>gantianBOS: lokasi setrika asrama</title>
     <meta name="description"
         content="Setrika bersama sekarang ada di kamar mana? Lihat lokasi terakhir dan perbarui kalau setrikanya pindah.">
     <link rel="stylesheet" href="style.css">
@@ -40,13 +40,13 @@
         </symbol>
     </svg>
     <noscript>
-        <p style="padding:16px">SetrikaMap membutuhkan JavaScript untuk berjalan.</p>
+        <p style="padding:16px">gantianBOS membutuhkan JavaScript untuk berjalan.</p>
     </noscript>
 
     <div class="app">
         <header class="top enter" style="--i:0">
             <div class="brand">
-                <h1>SetrikaMap</h1>
+                <h1>gantianBOS</h1>
                 <p>Lokasi setrika bersama asrama</p>
             </div>
             <label class="pick-lorong" id="lorongWrap" hidden><span>Lorong</span>
@@ -64,7 +64,7 @@
                     <svg class="ic" aria-hidden="true">
                         <use href="#i-iron" />
                     </svg>
-                    <h2 id="stQ">Setrika sekarang ada di mana?</h2>
+                    <h2 id="stQ">Lokasi setrika saat ini</h2>
                 </div>
                 <div class="stage" id="stBody"></div>
 
@@ -83,7 +83,7 @@
                     <button type="button" class="btn primary block" id="btnConfirmTurn" hidden>Mulai Menggunakan
                         (Giliran Saya)</button>
                 </div>
-                <p class="note">Lokasi berpindah otomatis saat penghuni mulai dan selesai menggunakan setrika.</p>
+                <p class="note">⚠️ <strong>Penting:</strong> Ambil dulu setrika di lokasi terakhir saat ini, baru kemudian tekan <em>Mulai Menggunakan</em>.</p>
             </section>
 
             <!-- Antrian -->
@@ -113,8 +113,7 @@
                 <ol>
                     <li><strong>Cek Status & Lokasi:</strong> Lihat di kartu atas apakah setrika sedang bebas atau
                         sedang dipakai orang lain.</li>
-                    <li><strong>Mulai Menggunakan (Jika Bebas):</strong> Tekan <em>Mulai Menggunakan</em>, pilih nomor
-                        kamarmu, dan setrika otomatis tercatat berpindah ke kamarmu selama 15 menit.</li>
+                    <li><strong>Mulai Menggunakan (Jika Bebas):</strong> Pastikan sudah mengambil setrikanya terlebih dahulu di kamar lokasi terakhir. Setelah setrika di tangan, tekan <em>Mulai Menggunakan</em> dan pilih nomor kamarmu agar lokasi otomatis tercatat berpindah ke kamarmu.</li>
                     <li><strong>Notifikasi Waktu Habis & Tambah Waktu:</strong> Setelah 15 menit, akan muncul notifikasi
                         suara dan dialog peringatan. Anda diberi waktu tenggang (delay) 1 menit untuk menekan <em>+
                             Tambah Waktu 5 Menit</em> jika masih perlu, atau sesi akan otomatis diselesaikan sistem.
@@ -165,6 +164,7 @@
         </section>
         <section class="pane" id="paneStartSession" hidden>
             <h2 id="ssTitle" tabindex="-1">Pilih Kamar Kamu</h2>
+            <p class="hint" style="color:var(--warn);font-weight:600;margin-bottom:8px">Pastikan setrika sudah kamu ambil dari lokasi terakhir sebelum mulai.</p>
             <p class="hint">Ketuk kamarmu pada denah lorong di bawah:</p>
             <div class="floor dlg-floor" id="dlgFloor">
                 <div class="col" id="dlgColL"></div>
