@@ -1444,8 +1444,14 @@ input::placeholder {
     border-top: 1px solid var(--ctrl)
 }
 
-.queue-section #queueJoinForm .lbl { margin-bottom: 6px }
-.queue-section #queueJoinForm .btn { margin-top: 10px }
+.queue-section #queueJoinForm .lbl {
+    margin-bottom: 6px
+}
+
+.queue-section #queueJoinForm .btn {
+    margin-top: 10px
+}
+
 .queue-section #queueJoinForm .link {
     margin-top: 4px;
     align-self: flex-start
@@ -1502,11 +1508,24 @@ input::placeholder {
     flex: none
 }
 
-.queue-item.ready .qi-num { background: var(--field); color: var(--on-field) }
-.queue-item.mine .qi-num { background: var(--ink); color: var(--bg) }
-.queue-item.mine.ready .qi-num { background: var(--field); color: var(--on-field) }
+.queue-item.ready .qi-num {
+    background: var(--field);
+    color: var(--on-field)
+}
 
-.qi-info { min-width: 0 }
+.queue-item.mine .qi-num {
+    background: var(--ink);
+    color: var(--bg)
+}
+
+.queue-item.mine.ready .qi-num {
+    background: var(--field);
+    color: var(--on-field)
+}
+
+.qi-info {
+    min-width: 0
+}
 
 .qi-name {
     font-weight: 700;
@@ -1557,7 +1576,9 @@ input::placeholder {
     transition: background-color var(--d) var(--ease), color var(--d) var(--ease)
 }
 
-.qi-cancel .ic { font-size: 16px }
+.qi-cancel .ic {
+    font-size: 16px
+}
 
 @media (hover:hover) {
     .qi-cancel:hover {
@@ -1566,7 +1587,9 @@ input::placeholder {
     }
 }
 
-.qi-cancel:active { transform: scale(.92) }
+.qi-cancel:active {
+    transform: scale(.92)
+}
 
 .qi-countdown {
     font-size: .8125rem;
@@ -1575,7 +1598,9 @@ input::placeholder {
     margin-top: 2px
 }
 
-.qi-countdown.urgent { color: var(--err) }
+.qi-countdown.urgent {
+    color: var(--err)
+}
 
 .queue-empty {
     padding: 14px 16px;
@@ -1592,6 +1617,25 @@ input::placeholder {
     margin-top: 4px
 }
 
+.credit {
+    margin-top: 28px;
+    padding: 16px 0;
+    text-align: center;
+    border-top: 1px solid var(--tone);
+}
+
+.credit p {
+    margin: 0;
+    font-size: .875rem;
+    color: var(--muted);
+    letter-spacing: .02em;
+}
+
+.credit strong {
+    color: var(--ink);
+    font-weight: 800;
+}
+
 @media (min-width:960px) {
     .layout {
         grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
@@ -1599,10 +1643,17 @@ input::placeholder {
             "hero plan"
             "queue plan"
             "hist plan"
-            "help plan";
-        grid-template-rows: auto auto auto 1fr
+            "help plan"
+            "credit plan";
+        grid-template-rows: auto auto auto auto 1fr
     }
 
-    .queue-section { grid-area: queue }
-}
+    .queue-section {
+        grid-area: queue
+    }
 
+    .credit {
+        grid-area: credit;
+        text-align: left;
+    }
+}
