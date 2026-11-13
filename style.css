@@ -1,56 +1,114 @@
 /* ===== Token =====
-   Satu arti untuk oranye: "di sinilah setrikanya" (hero dan kamar bertanda).
-   Tombol dan teks memakai tinta gelap, supaya mata langsung ke oranye. */
+   Biru dipakai hemat: hanya untuk aksi utama, status, dan "di sinilah setrikanya".
+   Sisanya netral dengan garis tipis; nomor kamar jadi bintangnya.
+   Mode gelap otomatis mengikuti setelan perangkat. */
 :root {
-    --bg: #eef0f2;
+    --bg: #f1f3f8;
     --surface: #ffffff;
-    --ink: #11181f;
-    --muted: #4d5864;
-    --ctrl: #7d8793;
-    --hover: #e1e5e9;
-    --tone: #e4e8eb;
-    --field: #ff7a3d;
-    --on-field: #11181f;
-    --on-field-2: #4a2208;
-    --quiet: #dde1e5;
-    --on-quiet: #11181f;
-    --on-quiet-2: #4d5864;
-    --link: #b5420d;
-    --ok: #1b7a3a;
+    --ink: #0b1230;
+    --muted: #4a5372;
+    --ctrl: #8a93ab;
+    --line: #dde1ec;
+    --hover: #e8ecf6;
+    --tone: #e7eaf3;
+    --accent: #1e44f0;
+    --accent-2: #2f54eb;
+    --tint: #e6ecff;
+    --tint-ink: #1534c8;
+    --tint-line: rgba(30, 68, 240, .28);
+    --sel-bg: #0b1230;
+    --sel-ink: #ffffff;
+    --field: var(--accent);
+    --on-field: #ffffff;
+    --on-field-2: #dce4ff;
+    --quiet: #e2e6f2;
+    --on-quiet: #0b1230;
+    --on-quiet-2: #4a5372;
+    --link: #1534c8;
+    --ok: #12804a;
     --warn: #b45309;
     --err: #b3261e;
     --r: 12px;
     --r-lg: 24px;
-    --shadow-float: 0 14px 44px rgba(17, 24, 31, .28);
+    --shadow-float: 0 14px 44px rgba(11, 18, 48, .28);
+    --shadow-card: 0 1px 2px rgba(11, 18, 48, .04), 0 8px 24px -14px rgba(11, 18, 48, .12);
     --ease: cubic-bezier(.22, 1, .36, 1);
     --ease-in: cubic-bezier(.4, 0, 1, 1);
     --d-fast: 120ms;
     --d: 200ms;
     --d-slow: 420ms;
-    --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3 5l4 4 4-4' fill='none' stroke='%2311181f' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+
+    /* kartu hero (terang): bebas = biru, dipakai orang = navy */
+    --h-bg: radial-gradient(130% 90% at 100% 0%, #3b5bff 0%, #1e44f0 55%, #1838d6 100%);
+    --h-ink: #ffffff;
+    --h-ink-2: #dce4ff;
+    --h-shadow: 0 18px 36px -20px rgba(30, 68, 240, .75);
+    --h-line: transparent;
+    --h-card: rgba(255, 255, 255, .14);
+    --h-pill: rgba(255, 255, 255, .16);
+    --h-btn: #0b1230;
+    --h-btn-ink: #ffffff;
+    --h-btn-sh: 0 8px 20px -10px rgba(11, 18, 48, .7);
+    --h-sec-line: rgba(255, 255, 255, .45);
+    --h-track: rgba(255, 255, 255, .22);
+    --h-fill: #ffffff;
+    --h-urgent: #ffd0cc;
+    --h-steps-bg: #ffffff;
+    --h-steps-ink: #0b1230;
+    --h-steps-ink-2: #5b6478;
+    --h-steps-line: rgba(11, 18, 48, .08);
+    --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3 5l4 4 4-4' fill='none' stroke='%230b1230' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 @media (prefers-color-scheme:dark) {
     :root {
-        --bg: #0f1419;
-        --surface: #182028;
-        --ink: #eef2f5;
-        --muted: #9aa6b2;
-        --ctrl: #6f7c89;
-        --hover: #212b35;
-        --tone: #1b242d;
-        --field: #ff8a4c;
-        --on-field: #11181f;
-        --on-field-2: #4a2208;
-        --quiet: #26313b;
-        --on-quiet: #eef2f5;
-        --on-quiet-2: #9aa6b2;
-        --link: #ff9a68;
-        --ok: #5fd38a;
-        --warn: #f0b44a;
+        --bg: #07090f;
+        --surface: #0e121c;
+        --ink: #f2f4f8;
+        --muted: #a3abbe;
+        --ctrl: #5f6a82;
+        --line: rgba(255, 255, 255, .09);
+        --hover: #161b28;
+        --tone: #111623;
+        --accent: #4d6fff;
+        --accent-2: #6e8bff;
+        --tint: rgba(77, 111, 255, .14);
+        --tint-ink: #8ea5ff;
+        --tint-line: rgba(110, 139, 255, .4);
+        --sel-bg: #4d6fff;
+        --sel-ink: #ffffff;
+        --on-field: #ffffff;
+        --on-field-2: #a3abbe;
+        --quiet: #111623;
+        --on-quiet: #f2f4f8;
+        --on-quiet-2: #a3abbe;
+        --link: #8ea5ff;
+        --ok: #32d583;
+        --warn: #fdb022;
         --err: #ff9b92;
-        --shadow-float: 0 14px 44px rgba(0, 0, 0, .6);
-        --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3 5l4 4 4-4' fill='none' stroke='%23eef2f5' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        --shadow-float: 0 14px 44px rgba(0, 0, 0, .65);
+        --shadow-card: 0 1px 0 rgba(255, 255, 255, .04) inset, 0 12px 32px -18px rgba(0, 0, 0, .8);
+
+        /* kartu hero (gelap): permukaan gelap + cahaya biru tipis di pojok */
+        --h-bg: radial-gradient(80% 65% at 100% 0%, rgba(77, 111, 255, .24), transparent 70%), #0e121c;
+        --h-ink: #f2f4f8;
+        --h-ink-2: #a3abbe;
+        --h-shadow: 0 1px 0 rgba(255, 255, 255, .05) inset, 0 16px 40px -20px rgba(0, 0, 0, .9);
+        --h-line: rgba(255, 255, 255, .09);
+        --h-card: rgba(255, 255, 255, .05);
+        --h-pill: rgba(255, 255, 255, .06);
+        --h-btn: linear-gradient(180deg, #6e8bff, #4d6fff);
+        --h-btn-ink: #ffffff;
+        --h-btn-sh: 0 1px 0 rgba(255, 255, 255, .25) inset, 0 0 0 1px rgba(110, 139, 255, .5), 0 10px 30px -10px rgba(77, 111, 255, .65);
+        --h-sec-line: rgba(255, 255, 255, .18);
+        --h-track: rgba(255, 255, 255, .1);
+        --h-fill: #4d6fff;
+        --h-urgent: #ff9b92;
+        --h-steps-bg: rgba(255, 255, 255, .04);
+        --h-steps-ink: #f2f4f8;
+        --h-steps-ink-2: #8d96ab;
+        --h-steps-line: rgba(255, 255, 255, .07);
+        --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3 5l4 4 4-4' fill='none' stroke='%23f2f4f8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     }
 }
 
@@ -71,7 +129,7 @@ body {
     margin: 0;
     background: var(--bg);
     color: var(--ink);
-    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font: 16px/1.5 "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     -webkit-font-smoothing: antialiased
 }
 
@@ -94,7 +152,7 @@ p {
 }
 
 :focus-visible {
-    outline: 3px solid var(--ink);
+    outline: 3px solid var(--accent);
     outline-offset: 3px
 }
 
@@ -374,32 +432,83 @@ p {
     margin-top: 4px
 }
 
-/* ===== Hero: jawaban atas "Setrika sekarang ada di mana?" ===== */
+/* ===== Hero: jawaban atas "Setrika sekarang ada di mana?" =====
+   Warna kartu mengikuti status (data-state diisi app.js): free/queued/ready/mine = biru,
+   busy = navy. Saat memuat atau belum diketahui (.quiet) kartu netral. */
 .hero {
-    --hf: var(--field);
-    --hi: var(--on-field);
-    --hi2: var(--on-field-2);
+    --hi: var(--h-ink);
+    --hi2: var(--h-ink-2);
+    position: relative;
     padding: 20px 20px 22px;
     border-radius: var(--r-lg);
-    background: var(--hf);
+    background: var(--h-bg);
     color: var(--hi);
-    transition: background-color var(--d-slow) var(--ease), color var(--d-slow) var(--ease)
+    border: 1px solid var(--h-line);
+    box-shadow: var(--h-shadow)
+}
+
+.hero[data-state="busy"] {
+    --h-bg: radial-gradient(120% 90% at 100% 0%, #1b2a6b 0%, #0b1230 62%);
+    --hi2: #b9c1e0;
+    --h-btn: linear-gradient(180deg, #4a6cff, #2f54eb);
+    --h-sec-line: rgba(255, 255, 255, .3);
+    --h-card: rgba(255, 255, 255, .08);
+    --h-pill: rgba(255, 255, 255, .1);
+    --h-shadow: 0 18px 36px -20px rgba(11, 18, 48, .8);
+    --h-fill: #6e8bff
 }
 
 .hero.quiet {
-    --hf: var(--quiet);
+    --h-bg: var(--quiet);
     --hi: var(--on-quiet);
-    --hi2: var(--on-quiet-2)
+    --hi2: var(--on-quiet-2);
+    --h-card: var(--surface);
+    --h-pill: transparent;
+    --h-btn: var(--ink);
+    --h-btn-ink: var(--bg);
+    --h-btn-sh: none;
+    --h-sec-line: var(--ctrl);
+    --h-track: var(--line);
+    --h-fill: var(--accent);
+    --h-shadow: none;
+    --h-line: var(--line)
+}
+
+@media (prefers-color-scheme:dark) {
+    .hero[data-state="busy"] {
+        --h-bg: radial-gradient(80% 65% at 100% 0%, rgba(253, 176, 34, .12), transparent 70%), #0e121c;
+        --hi2: #a3abbe;
+        --h-btn: linear-gradient(180deg, #6e8bff, #4d6fff);
+        --h-card: rgba(255, 255, 255, .05);
+        --h-pill: rgba(255, 255, 255, .06);
+        --h-shadow: 0 1px 0 rgba(255, 255, 255, .05) inset, 0 16px 40px -20px rgba(0, 0, 0, .9);
+        --h-fill: #4d6fff
+    }
+
+    .hero[data-state="mine"] {
+        --h-bg: radial-gradient(85% 70% at 100% 0%, rgba(77, 111, 255, .34), transparent 70%), #0e121c
+    }
+
+    .hero.quiet {
+        --h-bg: #0e121c;
+        --h-btn: linear-gradient(180deg, #6e8bff, #4d6fff);
+        --h-btn-ink: #fff;
+        --h-card: rgba(255, 255, 255, .05);
+        --h-sec-line: rgba(255, 255, 255, .18);
+        --h-track: rgba(255, 255, 255, .1);
+        --h-fill: #4d6fff
+    }
 }
 
 .hero-top {
     display: flex;
     align-items: center;
-    gap: 10px
+    flex-wrap: wrap;
+    gap: 8px 10px
 }
 
 .hero-top .ic {
-    font-size: 26px;
+    font-size: 22px;
     color: var(--hi)
 }
 
@@ -410,6 +519,41 @@ p {
     color: var(--hi2)
 }
 
+/* Pill status: titik berwarna + kata, supaya keadaan terbaca tanpa menebak warna */
+.state {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px 6px 10px;
+    border-radius: 999px;
+    background: var(--h-pill);
+    border: 1px solid var(--h-line);
+    color: var(--hi);
+    font-size: .8125rem;
+    font-weight: 700;
+    line-height: 1.2
+}
+
+.state-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 0 3px rgba(74, 222, 128, .25)
+}
+
+.hero[data-state="busy"] .state-dot,
+.hero[data-state="queued"] .state-dot {
+    background: #fdb022;
+    box-shadow: 0 0 0 3px rgba(253, 176, 34, .25)
+}
+
+.hero[data-state="mine"] .state-dot {
+    background: #9db4ff;
+    box-shadow: 0 0 0 3px rgba(157, 180, 255, .3)
+}
+
 .stage {
     position: relative;
     margin-top: 20px
@@ -418,8 +562,8 @@ p {
 .loc {
     font-size: 1rem;
     line-height: 1;
-    font-weight: 800;
-    letter-spacing: -.04em;
+    font-weight: 700;
+    letter-spacing: -.045em;
     overflow-wrap: anywhere
 }
 
@@ -501,11 +645,11 @@ p {
     align-items: flex-start;
     gap: 9px;
     margin-top: 14px;
-    padding: 9px 13px;
+    padding: 8px 13px;
     border-radius: 14px;
-    background: var(--surface);
-    color: var(--ink);
-    font-size: .9375rem;
+    background: var(--h-card);
+    color: var(--hi);
+    font-size: .875rem;
     line-height: 1.4;
     max-width: 100%
 }
@@ -516,15 +660,15 @@ p {
 
 .dot {
     flex: none;
-    width: 10px;
-    height: 10px;
+    width: 9px;
+    height: 9px;
     margin-top: 6px;
     border-radius: 50%;
-    background: var(--muted)
+    background: var(--hi2)
 }
 
 .fresh-ok .dot {
-    background: var(--ok)
+    background: #4ade80
 }
 
 .stage.changed .fresh-ok .dot {
@@ -532,90 +676,154 @@ p {
 }
 
 .fresh-stale .dot {
-    background: var(--warn)
+    background: #fdb022
 }
 
+/* Tombol di dalam hero: aksi utama mengikuti --h-btn, aksi sekunder hanya garis tipis */
 .hero .btn {
     margin-top: 0;
-    background: rgba(17, 24, 31, .85);
+    background: transparent;
+    border-color: var(--h-sec-line);
+    color: var(--hi)
+}
+
+.hero .btn.primary,
+.hero .btn.session-end {
+    background: var(--h-btn);
     border-color: transparent;
-    color: #ffffff;
+    color: var(--h-btn-ink);
+    box-shadow: var(--h-btn-sh)
 }
 
 .hero .btn:not([disabled]):hover {
-    background: #11181f;
+    background: color-mix(in srgb, var(--hi) 10%, transparent)
+}
+
+.hero .btn.primary:not([disabled]):hover,
+.hero .btn.session-end:not([disabled]):hover {
+    background: var(--h-btn);
+    color: var(--h-btn-ink);
+    filter: brightness(1.1)
 }
 
 .hero .btn[disabled] {
-    background: rgba(17, 24, 31, .25);
-    color: rgba(17, 24, 31, .6);
-    border-color: transparent;
-    opacity: 1;
+    opacity: .5
 }
 
-.hero .btn.primary {
-    background: #11181f;
-    color: #ffffff;
-    border-color: #11181f;
+.hero :focus-visible {
+    outline-color: var(--hi)
 }
 
-.hero .btn.primary:not([disabled]):hover {
-    background: #000000;
-    color: #ffffff;
-    border-color: #000000;
+/* Panduan 2 langkah di atas tombol (menggantikan catatan kecil di bawahnya) */
+.steps {
+    list-style: none;
+    margin: 18px 0 0;
+    padding: 2px 14px;
+    border-radius: var(--r);
+    background: var(--h-steps-bg);
+    color: var(--h-steps-ink)
 }
 
-.hero .btn.session-end {
-    background: #d32f2f;
-    border-color: #d32f2f;
-    color: #ffffff;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, .2);
+.steps li {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 12px 0;
+    font-size: .9375rem;
+    font-weight: 600;
+    line-height: 1.35
 }
 
-.hero .btn.session-end:not([disabled]):hover {
-    background: #b71c1c;
+.steps li+li {
+    border-top: 1px solid var(--h-steps-line)
 }
 
+.steps .n {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    margin-top: -1px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: .75rem;
+    font-weight: 800;
+    background: var(--tint);
+    color: var(--tint-ink)
+}
+
+.steps small {
+    display: block;
+    margin-top: 2px;
+    font-size: .8125rem;
+    font-weight: 500;
+    color: var(--h-steps-ink-2)
+}
+
+.steps em {
+    font-style: normal;
+    font-weight: 700
+}
+
+/* Sesi aktif: sisa waktu jadi angka besar + bar progres */
 .hero .session-bar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: 10px 12px;
     margin-top: 18px;
-    padding: 11px 16px;
+    padding: 14px 16px;
     border-radius: var(--r);
-    background: #11181f;
-    color: #ffffff;
-    font-size: .9rem;
-    line-height: 1.4;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, .15);
+    background: var(--h-card);
+    color: var(--hi);
+    box-shadow: none
 }
 
 .hero .session-bar .sb-label {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex: 1 1 12rem;
+    font-size: .875rem;
     font-weight: 600;
-    flex: 1 1 auto;
-    color: #ffffff;
+    color: var(--hi2)
 }
 
 .hero .session-bar .sb-label .ic {
     font-size: 18px;
     flex: none;
-    color: var(--field);
+    color: var(--hi)
 }
 
 .hero .session-bar .sb-timer {
+    flex: none;
     font-variant-numeric: tabular-nums;
     font-weight: 800;
-    font-size: 1.05rem;
-    flex: none;
-    color: #ffffff;
+    font-size: 2rem;
+    line-height: 1;
+    letter-spacing: -.03em;
+    color: var(--hi)
 }
 
 .hero .session-bar .sb-timer.urgent {
-    color: #ff8a80;
+    color: var(--h-urgent)
+}
+
+.sb-prog {
+    flex: 0 0 100%;
+    height: 4px;
+    border-radius: 9px;
+    background: var(--h-track);
+    overflow: hidden
+}
+
+.sb-prog i {
+    display: block;
+    height: 100%;
+    border-radius: 9px;
+    background: var(--h-fill);
+    transition: width 1s linear
 }
 
 .note {
@@ -814,9 +1022,10 @@ p {
 
 .room.here,
 .room.here:hover {
-    background: var(--field);
-    border-color: var(--field);
-    color: var(--on-field)
+    background: var(--tint);
+    border-color: var(--tint-line);
+    color: var(--tint-ink);
+    box-shadow: none
 }
 
 .room.pop {
@@ -846,15 +1055,15 @@ p {
 
 .room.dlg-room.selected,
 .room.dlg-room.selected:hover {
-    background: #ffffff !important;
-    border-color: #ffffff !important;
-    color: #11181f !important;
-    box-shadow: none !important;
+    background: var(--sel-bg);
+    border-color: var(--sel-bg);
+    color: var(--sel-ink);
+    box-shadow: none;
 }
 
 .room.dlg-room.selected small,
 .room.dlg-room.selected:hover small {
-    color: #11181f !important;
+    color: var(--sel-ink);
 }
 
 .plan .floor {
@@ -1655,5 +1864,106 @@ input::placeholder {
     .credit {
         grid-area: credit;
         text-align: left;
+    }
+}
+
+
+/* ===== Penyempurnaan tampilan (garis tipis, aksen biru, mode gelap) ===== */
+::selection {
+    background: var(--accent);
+    color: #ffffff
+}
+
+html {
+    accent-color: var(--accent);
+    scrollbar-color: var(--ctrl) transparent
+}
+
+input {
+    caret-color: var(--accent)
+}
+
+.brand h1 span {
+    color: var(--accent)
+}
+
+.room {
+    border-color: var(--line);
+    box-shadow: var(--shadow-card)
+}
+
+.room.spacer {
+    box-shadow: none
+}
+
+.plan .room.here {
+    border-color: var(--tint-line)
+}
+
+.opt {
+    border-color: var(--line);
+    box-shadow: var(--shadow-card)
+}
+
+.opt[disabled] {
+    box-shadow: none
+}
+
+dialog {
+    border: 1px solid var(--line)
+}
+
+.queue-item {
+    border-color: var(--line);
+    background: var(--surface);
+    box-shadow: var(--shadow-card)
+}
+
+.queue-item.ready {
+    border-color: var(--tint-line);
+    background: var(--tint)
+}
+
+.queue-item.mine {
+    border-color: var(--accent);
+    background: var(--surface)
+}
+
+.queue-item.mine.ready {
+    border-color: var(--accent);
+    background: var(--tint)
+}
+
+.queue-item.mine .qi-num,
+.queue-item.ready .qi-num,
+.queue-item.mine.ready .qi-num {
+    background: var(--accent);
+    color: #ffffff
+}
+
+.queue-item.ready .qi-status {
+    color: var(--tint-ink)
+}
+
+.queue-section #queueJoinForm {
+    border-top-color: var(--line)
+}
+
+.hist li.cur .hd {
+    background: var(--accent)
+}
+
+@media (prefers-color-scheme:dark) {
+
+    .btn.primary,
+    .btn.primary:not([disabled]):hover {
+        background: linear-gradient(180deg, #6e8bff, #4d6fff);
+        border-color: transparent;
+        color: #ffffff;
+        box-shadow: 0 1px 0 rgba(255, 255, 255, .25) inset, 0 0 0 1px rgba(110, 139, 255, .5), 0 10px 30px -10px rgba(77, 111, 255, .65)
+    }
+
+    .queue-item.ready .qi-status {
+        color: var(--tint-ink)
     }
 }

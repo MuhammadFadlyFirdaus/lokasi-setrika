@@ -5,11 +5,15 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light dark">
-    <meta name="theme-color" content="#eef0f2" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#0f1419" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#f1f3f8" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#07090f" media="(prefers-color-scheme: dark)">
     <title>gantianBOS: lokasi setrika asrama</title>
     <meta name="description"
         content="Setrika bersama sekarang ada di kamar mana? Lihat lokasi terakhir dan perbarui kalau setrikanya pindah.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -46,7 +50,7 @@
     <div class="app">
         <header class="top enter" style="--i:0">
             <div class="brand">
-                <h1>gantianBOS</h1>
+                <h1>gantian<span>BOS</span></h1>
                 <p>Lokasi setrika bersama asrama</p>
             </div>
             <label class="pick-lorong" id="lorongWrap" hidden><span>Lorong</span>
@@ -65,6 +69,8 @@
                         <use href="#i-iron" />
                     </svg>
                     <h2 id="stQ">Lokasi setrika saat ini</h2>
+                    <span class="state" id="stState" hidden><i class="state-dot" aria-hidden="true"></i><span
+                            id="stStateTxt"></span></span>
                 </div>
                 <div class="stage" id="stBody"></div>
 
@@ -72,6 +78,13 @@
                 <div id="sessionBox" hidden>
                     <div class="session-bar" id="sessionBar"></div>
                 </div>
+
+                <ol class="steps" id="heroSteps" hidden>
+                    <li><span class="n" aria-hidden="true">1</span><span>Ambil dulu setrikanya di lokasi terakhir<small>Sesuai
+                                kamar yang tercatat di atas</small></span></li>
+                    <li><span class="n" aria-hidden="true">2</span><span>Sudah di tangan? Baru tekan <em>Mulai
+                                Menggunakan</em></span></li>
+                </ol>
 
                 <div class="hero-actions" id="heroActions">
                     <button type="button" class="btn primary block" id="btnStartSession" hidden>Mulai
@@ -83,7 +96,6 @@
                     <button type="button" class="btn primary block" id="btnConfirmTurn" hidden>Mulai Menggunakan
                         (Giliran Saya)</button>
                 </div>
-                <p class="note">⚠️ <strong>Penting:</strong> Ambil dulu setrika di lokasi terakhir saat ini, baru kemudian tekan <em>Mulai Menggunakan</em>.</p>
             </section>
 
             <!-- Antrian -->

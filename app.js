@@ -422,6 +422,8 @@ function startSessionTimer(sess) {
                     timerEl.textContent = `Auto-selesai: ${graceSecLeft}s`;
                     timerEl.classList.add("urgent");
                 }
+                const prog = bar.querySelector(".sb-prog i");
+                if (prog) prog.style.width = "0%";
             }
 
             // Jika ini sesi saya dan dialog extend belum pernah muncul
@@ -452,6 +454,8 @@ function startSessionTimer(sess) {
                 timerEl.textContent = fmtCountdown(remainingToEst);
                 timerEl.classList.toggle("urgent", remainingToEst < 120000);
             }
+            const prog = bar.querySelector(".sb-prog i");
+            if (prog) prog.style.width = Math.max(0, Math.min(100, remainingToEst / estMs * 100)).toFixed(1) + "%";
         }
     }, 1000);
 }
@@ -572,6 +576,7 @@ function renderStatus() {
     }
     hero.classList.toggle("quiet", tone === "quiet");
     prevKey = known ? key : null;
+    renderHeroState();
 }
 
 function renderPlan() {
@@ -645,16 +650,39 @@ function renderSessionBox() {
         timerDisplay = `Auto-selesai: ${graceSecLeft}s`;
     }
 
+    const pct = Math.max(0, Math.min(100, (remaining / (CONFIG.SESSION_MINUTES * 60000)) * 100));
     bar.innerHTML = `
         <div class="sb-label">
             <svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg>
             <span>${isMySession(sess) ? "Kamu sedang menggunakan" : `${esc(who)} sedang menggunakan`} &middot; Estimasi waktu</span>
         </div>
-        <span class="sb-timer${remaining < 120000 ? " urgent" : ""}">${timerDisplay}</span>`;
+        <span class="sb-timer${remaining < 120000 ? " urgent" : ""}">${timerDisplay}</span>
+        <div class="sb-prog" aria-hidden="true"><i style="width:${pct.toFixed(1)}%"></i></div>`;
     startSessionTimer(sess);
 }
 
+/* Status hero (tampilan saja): menentukan warna kartu, pill status, dan panduan langkah. */
+function renderHeroState() {
+    const hero = $("#hero"), pill = $("#stState"), txt = $("#stStateTxt"), steps = $("#heroSteps");
+    if (!hero || !pill || !txt || !steps) return;
+    if (!CLOUD || hero.classList.contains("quiet")) {
+        delete hero.dataset.state; pill.hidden = true; steps.hidden = true; return;
+    }
+    const sess = QS.session, active = isSessionActive(sess), mine = active && isMySession(sess);
+    const my = myQueueEntry();
+    let state = "free", label = "Bebas dipakai";
+    if (mine) { state = "mine"; label = "Kamu yang pegang"; }
+    else if (active) { state = "busy"; label = "Lagi dipakai"; }
+    else if (my && my.status === "ready") { state = "ready"; label = "Giliranmu!"; }
+    else if (QS.queue.length > 0) { state = "queued"; label = "Ada antrian"; }
+    hero.dataset.state = state;
+    txt.textContent = label;
+    pill.hidden = false;
+    steps.hidden = !(state === "free" || state === "ready");
+}
+
 function renderHeroButtons() {
+    renderHeroState();
     const sess = QS.session, active = isSessionActive(sess);
     const myEntry = myQueueEntry(), iAmReady = myEntry && myEntry.status === "ready";
     const activeByOther = active && !isMySession(sess);
@@ -728,7 +756,7 @@ function renderQueue() {
             waitEstimate = `~${totalEst} mnt lagi`;
         }
 
-        const statusLabel = isReady ? (isMine ? "✨ Giliran kamu!" : "Giliran Berikutnya")
+        const statusLabel = isReady ? (isMine ? "Giliran kamu!" : "Giliran Berikutnya")
             : (idx === 0 ? "Menunggu giliran berikutnya" : "Menunggu");
         const cancelBtn = (isMine && q.status === "waiting")
             ? `<button class="qi-cancel" data-cancel-qid="${esc(q.id)}" aria-label="Batalkan antrianku"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>`
@@ -992,6 +1020,11 @@ function renderDlgFloor() {
     const colL = $("#dlgColL"), colR = $("#dlgColR");
     if (colL) colL.innerHTML = L.left.map(cell).join("");
     if (colR) colR.innerHTML = L.right.map(cell).join("");
+    const ok = $("#ssOk");
+    if (ok && !ok.disabled) {
+        const r = roomsOf(L).find(x => x.id === selectedStartRoomId);
+        ok.textContent = r ? `Mulai pakai di Kamar ${r.label}` : "Mulai Pakai";
+    }
 }
 
 function openStartSessionDialog() {
@@ -1075,7 +1108,7 @@ async function submitStartSession() {
         if (errEl) errEl.textContent = "Gagal memulai sesi. Coba lagi.";
         toast("Gagal memulai sesi. Coba lagi.");
     } finally {
-        btn.disabled = false; btn.textContent = "Mulai Pakai";
+        btn.disabled = false; renderDlgFloor();
     }
 }
 async function handleExtendSession(addMinutes = 5) {
@@ -1224,6 +1257,11 @@ function renderDlgQueueFloor() {
     const colL = $("#dlgQueueColL"), colR = $("#dlgQueueColR");
     if (colL) colL.innerHTML = L.left.map(cell).join("");
     if (colR) colR.innerHTML = L.right.map(cell).join("");
+    const ok = $("#jqOk");
+    if (ok && !ok.disabled) {
+        const r = roomsOf(L).find(x => x.id === selectedQueueRoomId);
+        ok.textContent = r ? `Ambil antrian dari Kamar ${r.label}` : "Ambil Antrian";
+    }
 }
 
 function openJoinQueueDialog() {
@@ -1279,7 +1317,7 @@ async function submitJoinQueue() {
         if (errEl) errEl.textContent = e.message === "ALREADY_IN_QUEUE" ? "Kamu sudah ada di antrian ini." : "Gagal mendaftar. Cek koneksi internet.";
     } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = "Ambil Antrian";
+        renderDlgQueueFloor();
     }
 }
 
